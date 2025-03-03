@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import PageLayout from '@/components/layouts/PageLayout';
@@ -37,18 +36,19 @@ const Register = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(true);
 
-  // Initialize face-api models on component mount
   useEffect(() => {
     const initializeModels = async () => {
       try {
+        console.log('Starting model initialization');
         setIsModelLoading(true);
         await loadModels();
+        console.log('Models loaded successfully');
         setIsModelLoading(false);
       } catch (error) {
         console.error('Error loading face recognition models:', error);
         toast({
           title: "Error Loading Models",
-          description: "Failed to load face recognition models. Please refresh the page.",
+          description: "Failed to load face recognition models. Please check console for details.",
           variant: "destructive",
         });
         setIsModelLoading(false);
@@ -71,6 +71,7 @@ const Register = () => {
     if (!webcamRef.current || isModelLoading) return;
     
     try {
+      console.log('Attempting to capture face');
       // Get face descriptor from webcam
       const descriptor = await getFaceDescriptor(webcamRef.current);
       
@@ -90,6 +91,7 @@ const Register = () => {
         title: "Face Captured",
         description: "Your face has been successfully captured.",
       });
+      console.log('Face captured successfully');
     } catch (error) {
       console.error('Error capturing face:', error);
       toast({
@@ -115,6 +117,7 @@ const Register = () => {
     setIsSubmitting(true);
     
     try {
+      console.log('Submitting registration data');
       // Register face with Supabase
       const success = await registerFace(
         formData.employeeId,
@@ -137,6 +140,7 @@ const Register = () => {
           title: "Registration Successful",
           description: "Your face has been registered for attendance",
         });
+        console.log('Registration completed successfully');
         
         // Reset form
         setFormData({

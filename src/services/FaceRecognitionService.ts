@@ -9,13 +9,20 @@ export async function loadModels() {
   if (modelsLoaded) return;
   
   try {
-    await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
-      faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-      faceapi.nets.faceRecognitionNet.loadFromUri('/models')
-    ]);
+    console.log('Loading face recognition models from /models...');
+    
+    // Load models one by one with explicit progress logging
+    await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+    console.log('SSD Mobilenet model loaded');
+    
+    await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+    console.log('Face landmark model loaded');
+    
+    await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+    console.log('Face recognition model loaded');
+    
     modelsLoaded = true;
-    console.log('Face recognition models loaded successfully');
+    console.log('All face recognition models loaded successfully');
   } catch (error) {
     console.error('Error loading face recognition models:', error);
     throw error;
@@ -35,15 +42,22 @@ export function stringToDescriptor(str: string): Float32Array {
 // Get face descriptor from image
 export async function getFaceDescriptor(imageElement: HTMLImageElement | HTMLVideoElement): Promise<Float32Array | null> {
   try {
+    if (!modelsLoaded) {
+      console.log('Models not loaded, loading now...');
+      await loadModels();
+    }
+    
+    console.log('Detecting face in image...');
     const detections = await faceapi.detectSingleFace(imageElement)
       .withFaceLandmarks()
       .withFaceDescriptor();
     
     if (!detections) {
-      console.log('No face detected');
+      console.log('No face detected in the image');
       return null;
     }
     
+    console.log('Face detected successfully');
     return detections.descriptor;
   } catch (error) {
     console.error('Error getting face descriptor:', error);
@@ -78,6 +92,7 @@ export async function registerFace(
     let employeeUuid: string;
     
     if (empError || !employee) {
+      console.log('Employee not found, creating new employee record');
       // Employee doesn't exist, create new employee
       const { data: newEmployee, error: createError } = await supabase
         .from('employees')
@@ -91,8 +106,10 @@ export async function registerFace(
       }
       
       employeeUuid = newEmployee.id;
+      console.log('New employee created with ID:', employeeUuid);
     } else {
       employeeUuid = employee.id;
+      console.log('Existing employee found with ID:', employeeUuid);
       
       // Update existing employee
       const { error: updateError } = await supabase
@@ -104,6 +121,7 @@ export async function registerFace(
         console.error('Error updating employee:', updateError);
         return false;
       }
+      console.log('Employee data updated successfully');
     }
     
     // Store face encoding
@@ -119,6 +137,7 @@ export async function registerFace(
       return false;
     }
     
+    console.log('Face encoding stored successfully');
     return true;
   } catch (error) {
     console.error('Error registering face:', error);
@@ -133,6 +152,7 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
   confidence?: number; 
 }> {
   try {
+    console.log('Attempting to recognize face...');
     // Get all face encodings from the database
     const { data: encodings, error: encodingsError } = await supabase
       .from('face_encodings')
@@ -142,6 +162,8 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
       console.error('Error fetching face encodings:', encodingsError);
       return { recognized: false };
     }
+    
+    console.log(`Retrieved ${encodings.length} face encodings for comparison`);
     
     // Convert encodings to face descriptors
     const faceMatchers = encodings.map(entry => {
@@ -160,8 +182,10 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
     // If distance is below threshold, consider it a match (lower is better)
     // Typical threshold is 0.5-0.6
     const MATCH_THRESHOLD = 0.6;
+    console.log(`Best match distance: ${bestMatch.distance}, threshold: ${MATCH_THRESHOLD}`);
     
     if (bestMatch.distance <= MATCH_THRESHOLD) {
+      console.log('Match found! Retrieving employee details...');
       // Get employee details
       const { data: employee, error: employeeError } = await supabase
         .from('employees')
@@ -176,6 +200,7 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
       
       // Calculate confidence score (convert distance to a 0-100 scale)
       const confidence = Math.max(0, Math.min(100, (1 - bestMatch.distance / MATCH_THRESHOLD) * 100));
+      console.log(`Employee recognized: ${employee.name} with ${confidence.toFixed(2)}% confidence`);
       
       return { 
         recognized: true, 
@@ -184,6 +209,7 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
       };
     }
     
+    console.log('No match found for the face');
     return { recognized: false };
   } catch (error) {
     console.error('Error recognizing face:', error);
@@ -194,6 +220,8 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
 // Record attendance
 export async function recordAttendance(employeeId: string, status: string = 'present', confidence: number = 100): Promise<boolean> {
   try {
+    console.log('Recording attendance for employee ID:', employeeId);
+    
     const deviceInfo = {
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString()
@@ -231,6 +259,8 @@ export async function recordAttendance(employeeId: string, status: string = 'pre
     
     // If no record for today, add one
     if (!existingDate || existingDate.length === 0) {
+      console.log('First attendance today, adding date record');
+      
       const { error: dateError } = await supabase
         .from('attendance_dates')
         .insert({
@@ -243,11 +273,25 @@ export async function recordAttendance(employeeId: string, status: string = 'pre
         return false;
       }
       
+      // For updating total_attendance, we'll use a direct +1 instead of RPC
+      const { data: employeeData, error: getEmployeeError } = await supabase
+        .from('employees')
+        .select('total_attendance')
+        .eq('id', employeeId)
+        .single();
+        
+      if (getEmployeeError) {
+        console.error('Error getting employee data:', getEmployeeError);
+        return false;
+      }
+      
+      const currentCount = employeeData?.total_attendance || 0;
+      
       // Update total attendance count
       const { error: updateError } = await supabase
         .from('employees')
         .update({ 
-          total_attendance: supabase.rpc('increment', { x: 1 }),
+          total_attendance: currentCount + 1,
           last_attendance_time: new Date().toISOString()
         })
         .eq('id', employeeId);
@@ -258,6 +302,7 @@ export async function recordAttendance(employeeId: string, status: string = 'pre
       }
     }
     
+    console.log('Attendance recorded successfully');
     return true;
   } catch (error) {
     console.error('Error recording attendance:', error);
@@ -268,6 +313,8 @@ export async function recordAttendance(employeeId: string, status: string = 'pre
 // Store unrecognized face
 export async function storeUnrecognizedFace(imageData: string): Promise<boolean> {
   try {
+    console.log('Storing unrecognized face');
+    
     const deviceInfo = {
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString()
@@ -285,6 +332,7 @@ export async function storeUnrecognizedFace(imageData: string): Promise<boolean>
       return false;
     }
     
+    console.log('Unrecognized face stored successfully');
     return true;
   } catch (error) {
     console.error('Error storing unrecognized face:', error);
