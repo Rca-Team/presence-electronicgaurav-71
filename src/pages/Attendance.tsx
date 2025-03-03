@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/ui/stat-card';
 import PageLayout from '@/components/layouts/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/integrations/supabase/client';
 
 // Sample data
 const recentAttendanceData = [
@@ -25,42 +26,95 @@ const Attendance = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [attendanceResult, setAttendanceResult] = useState<{
     name: string;
-    status: 'Present' | 'Absent' | 'Late';
+    status: 'Present' | 'Absent' | 'Late' | 'Unknown';
     time: string;
   } | null>(null);
   
-  const handleCapture = (imageData: string) => {
+  const handleCapture = async (imageData: string) => {
     setIsProcessing(true);
     
-    // Simulate face recognition processing
-    setTimeout(() => {
-      // Simulate successful recognition with random data
-      const names = ['John Doe', 'Jane Smith', 'Michael Brown', 'Emily Johnson', 'Robert Davis'];
-      const randomName = names[Math.floor(Math.random() * names.length)];
-      const randomStatus = Math.random() > 0.2 ? 'Present' : 'Late';
+    try {
+      // Simulate face recognition with database check
+      // In a real app, this would call an API endpoint that processes the image
+      // For simulation, we'll add unknown face detection with a 30% chance
+      const recognitionResult = await simulateFaceRecognition(imageData);
       
-      const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      const formattedHours = hours % 12 || 12;
-      const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-      const time = `${formattedHours}:${formattedMinutes} ${ampm}`;
-      
-      setAttendanceResult({
-        name: randomName,
-        status: randomStatus as 'Present' | 'Late',
-        time,
-      });
-      
+      if (recognitionResult.found) {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const formattedHours = hours % 12 || 12;
+        const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+        const time = `${formattedHours}:${formattedMinutes} ${ampm}`;
+        
+        const status = hours < 9 ? 'Present' : 'Late';
+        
+        setAttendanceResult({
+          name: recognitionResult.name,
+          status: status as 'Present' | 'Late',
+          time,
+        });
+        
+        toast({
+          title: "Attendance Recorded",
+          description: `${recognitionResult.name} marked as ${status} at ${time}`,
+          variant: status === 'Late' ? "destructive" : "default",
+        });
+      } else {
+        // Person not found in database
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const formattedHours = hours % 12 || 12;
+        const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+        const time = `${formattedHours}:${formattedMinutes} ${ampm}`;
+        
+        setAttendanceResult({
+          name: "Unknown Person",
+          status: 'Unknown',
+          time,
+        });
+        
+        toast({
+          title: "Recognition Failed",
+          description: "This person is not registered in the system.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Face recognition error:", error);
       toast({
-        title: "Attendance Recorded",
-        description: `${randomName} marked as ${randomStatus} at ${time}`,
-        variant: randomStatus === 'Late' ? "destructive" : "default",
+        title: "Processing Error",
+        description: "An error occurred while processing the image.",
+        variant: "destructive",
       });
-      
+    } finally {
       setIsProcessing(false);
-    }, 2000);
+    }
+  };
+  
+  // Simulate face recognition with database check
+  const simulateFaceRecognition = async (imageData: string) => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Simulate a 30% chance of not finding the person in the database
+    const notFound = Math.random() < 0.3;
+    
+    if (notFound) {
+      return { found: false };
+    }
+    
+    // Simulate successful recognition with random data
+    const names = ['John Doe', 'Jane Smith', 'Michael Brown', 'Emily Johnson', 'Robert Davis'];
+    const randomName = names[Math.floor(Math.random() * names.length)];
+    
+    return {
+      found: true,
+      name: randomName,
+    };
   };
   
   const resetAttendance = () => {
@@ -95,9 +149,25 @@ const Attendance = () => {
               )}
               
               {attendanceResult && (
-                <div className="bg-secondary/50 rounded-lg p-6 text-center">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <span className="text-primary text-xl font-semibold">{attendanceResult.name.charAt(0)}</span>
+                <div className={`rounded-lg p-6 text-center ${
+                  attendanceResult.status === 'Unknown' 
+                    ? 'bg-destructive/10 border border-destructive/20' 
+                    : 'bg-secondary/50'
+                }`}>
+                  <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
+                    attendanceResult.status === 'Unknown'
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-primary/10 text-primary'
+                  }`}>
+                    {attendanceResult.status === 'Unknown' ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-xl">
+                        <path d="M17.5 6.5c0 3-2.5 4-2.5 8"></path>
+                        <path d="M12 18h.01"></path>
+                        <circle cx="12" cy="12" r="9"></circle>
+                      </svg>
+                    ) : (
+                      <span className="text-xl font-semibold">{attendanceResult.name.charAt(0)}</span>
+                    )}
                   </div>
                   
                   <h3 className="text-xl font-bold">{attendanceResult.name}</h3>
@@ -106,21 +176,44 @@ const Attendance = () => {
                     <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
                       attendanceResult.status === 'Present' 
                         ? 'bg-green-500' 
-                        : 'bg-yellow-500'
+                        : attendanceResult.status === 'Late'
+                        ? 'bg-yellow-500'
+                        : 'bg-destructive'
                     }`}></span>
-                    Marked as {attendanceResult.status}
+                    {attendanceResult.status === 'Unknown' 
+                      ? 'Not Registered' 
+                      : `Marked as ${attendanceResult.status}`}
                   </div>
                   
                   <p className="text-muted-foreground mt-1">
                     {attendanceResult.time}
                   </p>
                   
-                  <Button
-                    className="mt-4"
-                    onClick={resetAttendance}
-                  >
-                    Take Another
-                  </Button>
+                  {attendanceResult.status === 'Unknown' && (
+                    <p className="mt-3 text-sm text-destructive">
+                      This person is not registered in the system.
+                    </p>
+                  )}
+                  
+                  <div className="mt-4 flex justify-center gap-2">
+                    <Button
+                      onClick={resetAttendance}
+                    >
+                      Take Another
+                    </Button>
+                    
+                    {attendanceResult.status === 'Unknown' && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          // Navigate to registration page
+                          window.location.href = '/register';
+                        }}
+                      >
+                        Register New Person
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
