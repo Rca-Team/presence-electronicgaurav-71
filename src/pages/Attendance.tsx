@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card } from '@/components/ui/card';
@@ -9,118 +9,198 @@ import { StatCard } from '@/components/ui/stat-card';
 import PageLayout from '@/components/layouts/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-
-// Sample data
-const recentAttendanceData = [
-  { name: 'John Doe', time: '08:32 AM', status: 'Present' },
-  { name: 'Jane Smith', time: '08:45 AM', status: 'Present' },
-  { name: 'Michael Brown', time: '09:01 AM', status: 'Late' },
-  { name: 'Emily Johnson', time: '08:15 AM', status: 'Present' },
-  { name: 'Robert Davis', time: '08:28 AM', status: 'Present' },
-  { name: 'Sarah Garcia', time: '09:15 AM', status: 'Late' },
-  { name: 'William Martinez', time: '08:55 AM', status: 'Present' },
-];
+import useFaceRecognition from '@/hooks/useFaceRecognition';
+import { loadModels } from '@/services/FaceRecognitionService';
 
 const Attendance = () => {
   const { toast } = useToast();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [attendanceResult, setAttendanceResult] = useState<{
-    name: string;
-    status: 'Present' | 'Absent' | 'Late' | 'Unknown';
-    time: string;
-  } | null>(null);
+  const webcamRef = useRef<HTMLVideoElement | null>(null);
+  const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    present: 0,
+    late: 0,
+    absent: 0,
+    total: 0
+  });
   
+  const {
+    processFace,
+    isProcessing,
+    isModelLoading,
+    result,
+    error,
+    resetResult
+  } = useFaceRecognition();
+  
+  // Load face-api models
+  useEffect(() => {
+    const initModels = async () => {
+      try {
+        // Create a /public/models directory and add the face-api.js models there
+        await loadModels();
+      } catch (err) {
+        console.error('Error loading face recognition models:', err);
+        toast({
+          title: "Model Loading Error",
+          description: "Failed to load face recognition models. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    initModels();
+  }, [toast]);
+  
+  // Fetch recent attendance data
+  useEffect(() => {
+    const fetchRecentAttendance = async () => {
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select(`
+          id,
+          status,
+          timestamp,
+          confidence_score,
+          employees(name)
+        `)
+        .order('timestamp', { ascending: false })
+        .limit(10);
+        
+      if (error) {
+        console.error('Error fetching recent attendance:', error);
+        return;
+      }
+      
+      if (data) {
+        setRecentAttendance(data.map(record => ({
+          name: record.employees?.name || 'Unknown',
+          time: new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: record.status.charAt(0).toUpperCase() + record.status.slice(1),
+          confidence: record.confidence_score
+        })));
+      }
+    };
+    
+    fetchRecentAttendance();
+    
+    // Set up real-time subscription for new attendance records
+    const subscription = supabase
+      .channel('attendance_changes')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'attendance_records' 
+      }, () => {
+        fetchRecentAttendance();
+      })
+      .subscribe();
+      
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+  
+  // Fetch attendance statistics
+  useEffect(() => {
+    const fetchStats = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Get total employees
+      const { data: employeesData, error: employeesError } = await supabase
+        .from('employees')
+        .select('id');
+        
+      if (employeesError) {
+        console.error('Error fetching employees:', employeesError);
+        return;
+      }
+      
+      const totalEmployees = employeesData?.length || 0;
+      
+      // Get present employees today
+      const { data: presentData, error: presentError } = await supabase
+        .from('attendance_dates')
+        .select('id')
+        .eq('date', today);
+        
+      if (presentError) {
+        console.error('Error fetching present employees:', presentError);
+        return;
+      }
+      
+      const presentEmployees = presentData?.length || 0;
+      
+      // Get late employees today
+      const { data: lateData, error: lateError } = await supabase
+        .from('attendance_records')
+        .select('id')
+        .eq('status', 'late')
+        .gte('timestamp', `${today}T00:00:00`)
+        .lte('timestamp', `${today}T23:59:59`);
+        
+      if (lateError) {
+        console.error('Error fetching late employees:', lateError);
+        return;
+      }
+      
+      const lateEmployees = lateData?.length || 0;
+      
+      // Calculate absent employees
+      const absentEmployees = Math.max(0, totalEmployees - presentEmployees);
+      
+      setStats({
+        present: presentEmployees,
+        late: lateEmployees,
+        absent: absentEmployees,
+        total: totalEmployees
+      });
+    };
+    
+    fetchStats();
+  }, []);
+  
+  // Handle face recognition capture
   const handleCapture = async (imageData: string) => {
-    setIsProcessing(true);
+    if (!webcamRef.current || isProcessing || isModelLoading) return;
     
     try {
-      // Simulate face recognition with database check
-      // In a real app, this would call an API endpoint that processes the image
-      // For simulation, we'll add unknown face detection with a 30% chance
-      const recognitionResult = await simulateFaceRecognition(imageData);
+      const recognitionResult = await processFace(webcamRef.current);
       
-      if (recognitionResult.found) {
-        const now = new Date();
-        const hours = now.getHours();
-        const minutes = now.getMinutes();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const formattedHours = hours % 12 || 12;
-        const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-        const time = `${formattedHours}:${formattedMinutes} ${ampm}`;
-        
-        const status = hours < 9 ? 'Present' : 'Late';
-        
-        setAttendanceResult({
-          name: recognitionResult.name,
-          status: status as 'Present' | 'Late',
-          time,
-        });
-        
+      if (!recognitionResult) {
         toast({
-          title: "Attendance Recorded",
-          description: `${recognitionResult.name} marked as ${status} at ${time}`,
-          variant: status === 'Late' ? "destructive" : "default",
+          title: "Processing Error",
+          description: error || "Failed to process face. Please try again.",
+          variant: "destructive",
         });
-      } else {
-        // Person not found in database
-        const now = new Date();
-        const hours = now.getHours();
-        const minutes = now.getMinutes();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const formattedHours = hours % 12 || 12;
-        const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-        const time = `${formattedHours}:${formattedMinutes} ${ampm}`;
-        
-        setAttendanceResult({
-          name: "Unknown Person",
-          status: 'Unknown',
-          time,
-        });
-        
+        return;
+      }
+      
+      if (!recognitionResult.recognized) {
         toast({
           title: "Recognition Failed",
           description: "This person is not registered in the system.",
           variant: "destructive",
         });
+        return;
       }
-    } catch (error) {
-      console.error("Face recognition error:", error);
+      
+      // Person recognized
+      toast({
+        title: "Attendance Recorded",
+        description: `${recognitionResult.employee.name} marked as ${recognitionResult.status} at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        variant: recognitionResult.status === 'late' ? "destructive" : "default",
+      });
+      
+    } catch (err) {
+      console.error('Face recognition error:', err);
       toast({
         title: "Processing Error",
         description: "An error occurred while processing the image.",
         variant: "destructive",
       });
-    } finally {
-      setIsProcessing(false);
     }
   };
   
-  // Simulate face recognition with database check
-  const simulateFaceRecognition = async (imageData: string) => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Simulate a 30% chance of not finding the person in the database
-    const notFound = Math.random() < 0.3;
-    
-    if (notFound) {
-      return { found: false };
-    }
-    
-    // Simulate successful recognition with random data
-    const names = ['John Doe', 'Jane Smith', 'Michael Brown', 'Emily Johnson', 'Robert Davis'];
-    const randomName = names[Math.floor(Math.random() * names.length)];
-    
-    return {
-      found: true,
-      name: randomName,
-    };
-  };
-  
-  const resetAttendance = () => {
-    setAttendanceResult(null);
-  };
-
   return (
     <PageLayout>
       <PageHeader
@@ -137,9 +217,17 @@ const Attendance = () => {
               <Webcam
                 onCapture={handleCapture}
                 className="w-full"
-                showControls={!isProcessing && !attendanceResult}
-                autoStart={!attendanceResult}
+                showControls={!isProcessing && !result}
+                autoStart={!result}
+                ref={webcamRef}
               />
+              
+              {isModelLoading && (
+                <div className="flex flex-col items-center py-4">
+                  <div className="h-10 w-10 rounded-full border-2 border-primary border-t-transparent animate-spin mb-2"></div>
+                  <p className="text-muted-foreground">Loading face recognition models...</p>
+                </div>
+              )}
               
               {isProcessing && (
                 <div className="flex flex-col items-center py-4">
@@ -148,65 +236,66 @@ const Attendance = () => {
                 </div>
               )}
               
-              {attendanceResult && (
+              {result && (
                 <div className={`rounded-lg p-6 text-center ${
-                  attendanceResult.status === 'Unknown' 
+                  result.status === 'unknown' 
                     ? 'bg-destructive/10 border border-destructive/20' 
                     : 'bg-secondary/50'
                 }`}>
                   <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
-                    attendanceResult.status === 'Unknown'
+                    result.status === 'unknown'
                       ? 'bg-destructive/10 text-destructive'
                       : 'bg-primary/10 text-primary'
                   }`}>
-                    {attendanceResult.status === 'Unknown' ? (
+                    {result.status === 'unknown' ? (
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-xl">
                         <path d="M17.5 6.5c0 3-2.5 4-2.5 8"></path>
                         <path d="M12 18h.01"></path>
                         <circle cx="12" cy="12" r="9"></circle>
                       </svg>
                     ) : (
-                      <span className="text-xl font-semibold">{attendanceResult.name.charAt(0)}</span>
+                      <span className="text-xl font-semibold">{result.employee?.name.charAt(0)}</span>
                     )}
                   </div>
                   
-                  <h3 className="text-xl font-bold">{attendanceResult.name}</h3>
+                  <h3 className="text-xl font-bold">
+                    {result.status === 'unknown' ? 'Unknown Person' : result.employee?.name}
+                  </h3>
                   
                   <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full bg-opacity-10 text-sm font-medium">
                     <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                      attendanceResult.status === 'Present' 
+                      result.status === 'present' 
                         ? 'bg-green-500' 
-                        : attendanceResult.status === 'Late'
+                        : result.status === 'late'
                         ? 'bg-yellow-500'
                         : 'bg-destructive'
                     }`}></span>
-                    {attendanceResult.status === 'Unknown' 
+                    {result.status === 'unknown' 
                       ? 'Not Registered' 
-                      : `Marked as ${attendanceResult.status}`}
+                      : `Marked as ${result.status}`}
                   </div>
                   
-                  <p className="text-muted-foreground mt-1">
-                    {attendanceResult.time}
-                  </p>
+                  {result.timestamp && (
+                    <p className="text-muted-foreground mt-1">
+                      {new Date(result.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
                   
-                  {attendanceResult.status === 'Unknown' && (
+                  {result.status === 'unknown' && (
                     <p className="mt-3 text-sm text-destructive">
                       This person is not registered in the system.
                     </p>
                   )}
                   
                   <div className="mt-4 flex justify-center gap-2">
-                    <Button
-                      onClick={resetAttendance}
-                    >
+                    <Button onClick={resetResult}>
                       Take Another
                     </Button>
                     
-                    {attendanceResult.status === 'Unknown' && (
+                    {result.status === 'unknown' && (
                       <Button
                         variant="outline"
                         onClick={() => {
-                          // Navigate to registration page
                           window.location.href = '/register';
                         }}
                       >
@@ -276,29 +365,35 @@ const Attendance = () => {
               <Card className="p-6">
                 <h3 className="text-lg font-medium mb-4">Recent Records</h3>
                 <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                  {recentAttendanceData.map((record, index) => (
-                    <div 
-                      key={index} 
-                      className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-primary font-medium text-xs">{record.name.charAt(0)}</span>
+                  {recentAttendance.length > 0 ? (
+                    recentAttendance.map((record, index) => (
+                      <div 
+                        key={index} 
+                        className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-primary font-medium text-xs">{record.name.charAt(0)}</span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{record.name}</p>
+                            <p className="text-xs text-muted-foreground">{record.time}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-sm">{record.name}</p>
-                          <p className="text-xs text-muted-foreground">{record.time}</p>
-                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          record.status === 'Present' 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-500' 
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-500'
+                        }`}>
+                          {record.status}
+                        </span>
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        record.status === 'Present' 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-500' 
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-500'
-                      }`}>
-                        {record.status}
-                      </span>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground">
+                      No attendance records for today
                     </div>
-                  ))}
+                  )}
                 </div>
               </Card>
             </TabsContent>
@@ -306,22 +401,22 @@ const Attendance = () => {
             <TabsContent value="stats" className="space-y-4 pt-4">
               <StatCard
                 title="Present Today"
-                value="85%"
-                description="105 out of 124 employees"
+                value={stats.total > 0 ? `${Math.round((stats.present / stats.total) * 100)}%` : '0%'}
+                description={`${stats.present} out of ${stats.total} employees`}
                 className="mb-4"
               />
               
               <StatCard
                 title="Late Arrivals"
-                value="12"
-                description="9.7% of total employees"
+                value={String(stats.late)}
+                description={stats.total > 0 ? `${Math.round((stats.late / stats.total) * 100)}% of total employees` : '0% of total employees'}
                 className="mb-4"
               />
               
               <StatCard
                 title="Absent"
-                value="7"
-                description="5.6% of total employees"
+                value={String(stats.absent)}
+                description={stats.total > 0 ? `${Math.round((stats.absent / stats.total) * 100)}% of total employees` : '0% of total employees'}
               />
             </TabsContent>
           </Tabs>

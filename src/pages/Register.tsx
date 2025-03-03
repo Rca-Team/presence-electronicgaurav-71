@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import PageLayout from '@/components/layouts/PageLayout';
 import { PageHeader } from '@/components/ui/page-header';
@@ -15,36 +15,95 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { loadModels, getFaceDescriptor, registerFace } from '@/services/FaceRecognitionService';
 
 const Register = () => {
   const { toast } = useToast();
+  const webcamRef = useRef<HTMLVideoElement | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     employeeId: '',
     department: '',
+    position: '',
+    year: '',
+    major: '',
+    standing: '',
+    startingYear: '',
   });
   const [faceImage, setFaceImage] = useState<string | null>(null);
+  const [faceDescriptor, setFaceDescriptor] = useState<Float32Array | null>(null);
   const [registrationStep, setRegistrationStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isModelLoading, setIsModelLoading] = useState(true);
+
+  // Initialize face-api models on component mount
+  useEffect(() => {
+    const initializeModels = async () => {
+      try {
+        setIsModelLoading(true);
+        await loadModels();
+        setIsModelLoading(false);
+      } catch (error) {
+        console.error('Error loading face recognition models:', error);
+        toast({
+          title: "Error Loading Models",
+          description: "Failed to load face recognition models. Please refresh the page.",
+          variant: "destructive",
+        });
+        setIsModelLoading(false);
+      }
+    };
+    
+    initializeModels();
+  }, [toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectChange = (value: string) => {
-    setFormData(prev => ({ ...prev, department: value }));
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleCaptureImage = (imageData: string) => {
-    setFaceImage(imageData);
+  const handleCaptureImage = async (imageData: string) => {
+    if (!webcamRef.current || isModelLoading) return;
+    
+    try {
+      // Get face descriptor from webcam
+      const descriptor = await getFaceDescriptor(webcamRef.current);
+      
+      if (!descriptor) {
+        toast({
+          title: "Face Detection Failed",
+          description: "No face detected. Please ensure your face is clearly visible.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setFaceImage(imageData);
+      setFaceDescriptor(descriptor);
+      
+      toast({
+        title: "Face Captured",
+        description: "Your face has been successfully captured.",
+      });
+    } catch (error) {
+      console.error('Error capturing face:', error);
+      toast({
+        title: "Capture Error",
+        description: "An error occurred while capturing your face. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!faceImage) {
+    if (!faceDescriptor) {
       toast({
         title: "Missing face image",
         description: "Please capture your face before submitting",
@@ -55,24 +114,58 @@ const Register = () => {
     
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      toast({
-        title: "Registration Successful",
-        description: "Your face has been registered for attendance",
-      });
+    try {
+      // Register face with Supabase
+      const success = await registerFace(
+        formData.employeeId,
+        faceDescriptor,
+        {
+          name: formData.name,
+          employee_id: formData.employeeId,
+          department: formData.department,
+          position: formData.position || undefined,
+          year: formData.year || undefined,
+          major: formData.major || undefined,
+          standing: formData.standing || undefined,
+          starting_year: formData.startingYear || undefined,
+          image_url: faceImage || undefined,
+        }
+      );
       
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        employeeId: '',
-        department: '',
+      if (success) {
+        toast({
+          title: "Registration Successful",
+          description: "Your face has been registered for attendance",
+        });
+        
+        // Reset form
+        setFormData({
+          name: '',
+          email: '',
+          employeeId: '',
+          department: '',
+          position: '',
+          year: '',
+          major: '',
+          standing: '',
+          startingYear: '',
+        });
+        setFaceImage(null);
+        setFaceDescriptor(null);
+        setRegistrationStep(1);
+      } else {
+        throw new Error("Registration failed");
+      }
+    } catch (error) {
+      console.error('Error registering face:', error);
+      toast({
+        title: "Registration Failed",
+        description: "There was an error registering your face. Please try again.",
+        variant: "destructive",
       });
-      setFaceImage(null);
-      setRegistrationStep(1);
-    }, 2000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -177,7 +270,7 @@ const Register = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="department">Department</Label>
-                    <Select value={formData.department} onValueChange={handleSelectChange} required>
+                    <Select value={formData.department} onValueChange={(value) => handleSelectChange('department', value)} required>
                       <SelectTrigger id="department">
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
@@ -189,6 +282,69 @@ const Register = () => {
                         <SelectItem value="operations">Operations</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="position">Position</Label>
+                    <Input
+                      id="position"
+                      name="position"
+                      value={formData.position}
+                      onChange={handleInputChange}
+                      placeholder="Software Engineer"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="major">Major/Specialization</Label>
+                    <Input
+                      id="major"
+                      name="major"
+                      value={formData.major}
+                      onChange={handleInputChange}
+                      placeholder="Computer Science"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="year">Current Year</Label>
+                    <Input
+                      id="year"
+                      name="year"
+                      value={formData.year}
+                      onChange={handleInputChange}
+                      placeholder="2023"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="standing">Standing</Label>
+                    <Select value={formData.standing} onValueChange={(value) => handleSelectChange('standing', value)}>
+                      <SelectTrigger id="standing">
+                        <SelectValue placeholder="Select standing" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="junior">Junior</SelectItem>
+                        <SelectItem value="mid">Mid-level</SelectItem>
+                        <SelectItem value="senior">Senior</SelectItem>
+                        <SelectItem value="lead">Lead</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="startingYear">Starting Year</Label>
+                    <Input
+                      id="startingYear"
+                      name="startingYear"
+                      value={formData.startingYear}
+                      onChange={handleInputChange}
+                      placeholder="2020"
+                    />
                   </div>
                 </div>
                 
@@ -221,31 +377,42 @@ const Register = () => {
                     Please look directly at the camera and ensure your face is clearly visible.
                   </p>
                   
-                  <div className="flex flex-col items-center">
-                    <Webcam
-                      onCapture={handleCaptureImage}
-                      className="max-w-md w-full"
-                      overlayClassName={faceImage ? "border-green-500" : ""}
-                    />
-                    
-                    {faceImage && (
-                      <div className="mt-4 text-center">
-                        <div className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-500 text-sm">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            className="h-4 w-4 mr-1"
-                          >
-                            <path d="M20 6L9 17l-5-5" />
-                          </svg>
-                          Face captured successfully
+                  {isModelLoading ? (
+                    <div className="flex flex-col items-center py-6">
+                      <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin mb-2"></div>
+                      <p className="text-muted-foreground">Loading face recognition models...</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <Webcam
+                        ref={webcamRef}
+                        onCapture={handleCaptureImage}
+                        className="max-w-md w-full"
+                        overlayClassName={faceImage ? "border-green-500" : ""}
+                      />
+                      
+                      {faceImage && (
+                        <div className="mt-4 text-center">
+                          <div className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-500 text-sm">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className="h-4 w-4 mr-1"
+                            >
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            Face captured successfully
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            You can recapture if you're not satisfied with the current image
+                          </p>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </Card>
               
@@ -258,7 +425,7 @@ const Register = () => {
                   Back
                 </Button>
                 
-                <Button type="submit" disabled={isSubmitting || !faceImage}>
+                <Button type="submit" disabled={isSubmitting || !faceImage || isModelLoading}>
                   {isSubmitting ? (
                     <>
                       <span className="h-4 w-4 mr-2 rounded-full border-2 border-current border-r-transparent animate-spin"></span>
