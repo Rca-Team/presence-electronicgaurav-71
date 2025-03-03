@@ -61,7 +61,7 @@ const Attendance = () => {
           status,
           timestamp,
           confidence_score,
-          employees(name)
+          profiles(username)
         `)
         .order('timestamp', { ascending: false })
         .limit(10);
@@ -73,7 +73,7 @@ const Attendance = () => {
       
       if (data) {
         setRecentAttendance(data.map(record => ({
-          name: record.employees?.name || 'Unknown',
+          name: record.profiles?.username || 'Unknown',
           time: new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           status: record.status.charAt(0).toUpperCase() + record.status.slice(1),
           confidence: record.confidence_score
@@ -105,32 +105,34 @@ const Attendance = () => {
     const fetchStats = async () => {
       const today = new Date().toISOString().split('T')[0];
       
-      // Get total employees
-      const { data: employeesData, error: employeesError } = await supabase
-        .from('employees')
+      // Get total profiles (users)
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
         .select('id');
         
-      if (employeesError) {
-        console.error('Error fetching employees:', employeesError);
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
         return;
       }
       
-      const totalEmployees = employeesData?.length || 0;
+      const totalProfiles = profilesData?.length || 0;
       
-      // Get present employees today
+      // Get present users today
       const { data: presentData, error: presentError } = await supabase
-        .from('attendance_dates')
+        .from('attendance_records')
         .select('id')
-        .eq('date', today);
+        .eq('status', 'present')
+        .gte('timestamp', `${today}T00:00:00`)
+        .lte('timestamp', `${today}T23:59:59`);
         
       if (presentError) {
-        console.error('Error fetching present employees:', presentError);
+        console.error('Error fetching present users:', presentError);
         return;
       }
       
-      const presentEmployees = presentData?.length || 0;
+      const presentUsers = presentData?.length || 0;
       
-      // Get late employees today
+      // Get late users today
       const { data: lateData, error: lateError } = await supabase
         .from('attendance_records')
         .select('id')
@@ -139,20 +141,20 @@ const Attendance = () => {
         .lte('timestamp', `${today}T23:59:59`);
         
       if (lateError) {
-        console.error('Error fetching late employees:', lateError);
+        console.error('Error fetching late users:', lateError);
         return;
       }
       
-      const lateEmployees = lateData?.length || 0;
+      const lateUsers = lateData?.length || 0;
       
-      // Calculate absent employees
-      const absentEmployees = Math.max(0, totalEmployees - presentEmployees);
+      // Calculate absent users
+      const absentUsers = Math.max(0, totalProfiles - presentUsers - lateUsers);
       
       setStats({
-        present: presentEmployees,
-        late: lateEmployees,
-        absent: absentEmployees,
-        total: totalEmployees
+        present: presentUsers,
+        late: lateUsers,
+        absent: absentUsers,
+        total: totalProfiles
       });
     };
     
@@ -219,7 +221,6 @@ const Attendance = () => {
                 className="w-full"
                 showControls={!isProcessing && !result}
                 autoStart={!result}
-                ref={webcamRef}
               />
               
               {isModelLoading && (
@@ -238,16 +239,16 @@ const Attendance = () => {
               
               {result && (
                 <div className={`rounded-lg p-6 text-center ${
-                  result.status === 'unknown' 
+                  result.status === 'unauthorized' 
                     ? 'bg-destructive/10 border border-destructive/20' 
                     : 'bg-secondary/50'
                 }`}>
                   <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
-                    result.status === 'unknown'
+                    result.status === 'unauthorized'
                       ? 'bg-destructive/10 text-destructive'
                       : 'bg-primary/10 text-primary'
                   }`}>
-                    {result.status === 'unknown' ? (
+                    {result.status === 'unauthorized' ? (
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-xl">
                         <path d="M17.5 6.5c0 3-2.5 4-2.5 8"></path>
                         <path d="M12 18h.01"></path>
@@ -259,7 +260,7 @@ const Attendance = () => {
                   </div>
                   
                   <h3 className="text-xl font-bold">
-                    {result.status === 'unknown' ? 'Unknown Person' : result.employee?.name}
+                    {result.status === 'unauthorized' ? 'Unknown Person' : result.employee?.name}
                   </h3>
                   
                   <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full bg-opacity-10 text-sm font-medium">
@@ -270,7 +271,7 @@ const Attendance = () => {
                         ? 'bg-yellow-500'
                         : 'bg-destructive'
                     }`}></span>
-                    {result.status === 'unknown' 
+                    {result.status === 'unauthorized' 
                       ? 'Not Registered' 
                       : `Marked as ${result.status}`}
                   </div>
@@ -281,7 +282,7 @@ const Attendance = () => {
                     </p>
                   )}
                   
-                  {result.status === 'unknown' && (
+                  {result.status === 'unauthorized' && (
                     <p className="mt-3 text-sm text-destructive">
                       This person is not registered in the system.
                     </p>
@@ -292,7 +293,7 @@ const Attendance = () => {
                       Take Another
                     </Button>
                     
-                    {result.status === 'unknown' && (
+                    {result.status === 'unauthorized' && (
                       <Button
                         variant="outline"
                         onClick={() => {
@@ -402,21 +403,21 @@ const Attendance = () => {
               <StatCard
                 title="Present Today"
                 value={stats.total > 0 ? `${Math.round((stats.present / stats.total) * 100)}%` : '0%'}
-                description={`${stats.present} out of ${stats.total} employees`}
+                description={`${stats.present} out of ${stats.total} profiles`}
                 className="mb-4"
               />
               
               <StatCard
                 title="Late Arrivals"
                 value={String(stats.late)}
-                description={stats.total > 0 ? `${Math.round((stats.late / stats.total) * 100)}% of total employees` : '0% of total employees'}
+                description={stats.total > 0 ? `${Math.round((stats.late / stats.total) * 100)}% of total profiles` : '0% of total profiles'}
                 className="mb-4"
               />
               
               <StatCard
                 title="Absent"
                 value={String(stats.absent)}
-                description={stats.total > 0 ? `${Math.round((stats.absent / stats.total) * 100)}% of total employees` : '0% of total employees'}
+                description={stats.total > 0 ? `${Math.round((stats.absent / stats.total) * 100)}% of total profiles` : '0% of total profiles'}
               />
             </TabsContent>
           </Tabs>

@@ -6,7 +6,7 @@ import { loadModels, getFaceDescriptor, recognizeFace, storeUnrecognizedFace, re
 export interface FaceRecognitionResult {
   recognized: boolean;
   employee?: any;
-  status?: 'present' | 'late' | 'absent' | 'unknown';
+  status?: 'present' | 'late' | 'absent' | 'unauthorized';
   confidence?: number;
   timestamp?: string;
 }
@@ -25,6 +25,7 @@ export const useFaceRecognition = () => {
         await loadModels();
         setIsModelLoading(false);
       } catch (err) {
+        console.error('Error loading face recognition models:', err);
         setError('Failed to load face recognition models');
         setIsModelLoading(false);
       }
@@ -70,7 +71,7 @@ export const useFaceRecognition = () => {
         
         const result = {
           recognized: false,
-          status: 'unknown' as const
+          status: 'unauthorized' as const
         };
         
         setResult(result);

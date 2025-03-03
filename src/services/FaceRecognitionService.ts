@@ -82,62 +82,35 @@ export async function registerFace(
   }
 ): Promise<boolean> {
   try {
-    // First check if employee exists
-    let { data: employee, error: empError } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('employee_id', employeeId)
-      .single();
-      
-    let employeeUuid: string;
-    
-    if (empError || !employee) {
-      console.log('Employee not found, creating new employee record');
-      // Employee doesn't exist, create new employee
-      const { data: newEmployee, error: createError } = await supabase
-        .from('employees')
-        .insert(employeeData)
-        .select('id')
-        .single();
-        
-      if (createError || !newEmployee) {
-        console.error('Error creating employee:', createError);
-        return false;
-      }
-      
-      employeeUuid = newEmployee.id;
-      console.log('New employee created with ID:', employeeUuid);
-    } else {
-      employeeUuid = employee.id;
-      console.log('Existing employee found with ID:', employeeUuid);
-      
-      // Update existing employee
-      const { error: updateError } = await supabase
-        .from('employees')
-        .update(employeeData)
-        .eq('id', employeeUuid);
-        
-      if (updateError) {
-        console.error('Error updating employee:', updateError);
-        return false;
-      }
-      console.log('Employee data updated successfully');
-    }
-    
-    // Store face encoding
-    const { error: encodingError } = await supabase
-      .from('face_encodings')
+    // Use the face_profiles table to store face data
+    const { error } = await supabase
+      .from('face_profiles')
       .insert({
-        employee_id: employeeUuid,
-        encoding: descriptorToString(faceDescriptor)
+        user_id: employeeId, 
+        face_data: descriptorToString(faceDescriptor)
       });
       
-    if (encodingError) {
-      console.error('Error storing face encoding:', encodingError);
+    if (error) {
+      console.error('Error storing face data:', error);
       return false;
     }
     
-    console.log('Face encoding stored successfully');
+    // Store user profile info in the profiles table
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({
+        id: employeeId,
+        username: employeeData.name,
+        // Store additional data as metadata or in another field if needed
+        updated_at: new Date().toISOString()
+      });
+      
+    if (profileError) {
+      console.error('Error storing profile information:', profileError);
+      return false;
+    }
+    
+    console.log('Face and profile information stored successfully');
     return true;
   } catch (error) {
     console.error('Error registering face:', error);
@@ -155,22 +128,22 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
     console.log('Attempting to recognize face...');
     // Get all face encodings from the database
     const { data: encodings, error: encodingsError } = await supabase
-      .from('face_encodings')
-      .select('encoding, employee_id');
+      .from('face_profiles')
+      .select('face_data, user_id');
       
     if (encodingsError || !encodings || encodings.length === 0) {
-      console.error('Error fetching face encodings:', encodingsError);
+      console.error('Error fetching face data:', encodingsError);
       return { recognized: false };
     }
     
-    console.log(`Retrieved ${encodings.length} face encodings for comparison`);
+    console.log(`Retrieved ${encodings.length} face profiles for comparison`);
     
     // Convert encodings to face descriptors
     const faceMatchers = encodings.map(entry => {
-      const descriptor = stringToDescriptor(entry.encoding);
+      const descriptor = stringToDescriptor(entry.face_data);
       return {
         descriptor,
-        employeeId: entry.employee_id,
+        userId: entry.user_id,
         distance: faceapi.euclideanDistance(descriptor, faceDescriptor)
       };
     });
@@ -185,26 +158,30 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
     console.log(`Best match distance: ${bestMatch.distance}, threshold: ${MATCH_THRESHOLD}`);
     
     if (bestMatch.distance <= MATCH_THRESHOLD) {
-      console.log('Match found! Retrieving employee details...');
-      // Get employee details
-      const { data: employee, error: employeeError } = await supabase
-        .from('employees')
+      console.log('Match found! Retrieving profile details...');
+      // Get profile details
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
         .select('*')
-        .eq('id', bestMatch.employeeId)
+        .eq('id', bestMatch.userId)
         .single();
         
-      if (employeeError || !employee) {
-        console.error('Error fetching employee details:', employeeError);
+      if (profileError || !profile) {
+        console.error('Error fetching profile details:', profileError);
         return { recognized: false };
       }
       
       // Calculate confidence score (convert distance to a 0-100 scale)
       const confidence = Math.max(0, Math.min(100, (1 - bestMatch.distance / MATCH_THRESHOLD) * 100));
-      console.log(`Employee recognized: ${employee.name} with ${confidence.toFixed(2)}% confidence`);
+      console.log(`User recognized: ${profile.username} with ${confidence.toFixed(2)}% confidence`);
       
       return { 
         recognized: true, 
-        employee,
+        employee: {
+          id: profile.id,
+          name: profile.username,
+          avatar_url: profile.avatar_url
+        },
         confidence
       };
     }
@@ -218,9 +195,9 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
 }
 
 // Record attendance
-export async function recordAttendance(employeeId: string, status: string = 'present', confidence: number = 100): Promise<boolean> {
+export async function recordAttendance(userId: string, status: string = 'present', confidence: number = 100): Promise<boolean> {
   try {
-    console.log('Recording attendance for employee ID:', employeeId);
+    console.log('Recording attendance for user ID:', userId);
     
     const deviceInfo = {
       userAgent: navigator.userAgent,
@@ -231,8 +208,8 @@ export async function recordAttendance(employeeId: string, status: string = 'pre
     const { error: attendanceError } = await supabase
       .from('attendance_records')
       .insert({
-        employee_id: employeeId,
-        status,
+        user_id: userId,
+        status: status as any, // Type casting since we're using a string
         confidence_score: confidence,
         device_info: deviceInfo
       });
@@ -240,66 +217,6 @@ export async function recordAttendance(employeeId: string, status: string = 'pre
     if (attendanceError) {
       console.error('Error recording attendance:', attendanceError);
       return false;
-    }
-    
-    // Get today's date
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Check if we already have an attendance record for today
-    const { data: existingDate, error: dateCheckError } = await supabase
-      .from('attendance_dates')
-      .select('id')
-      .eq('employee_id', employeeId)
-      .eq('date', today);
-      
-    if (dateCheckError) {
-      console.error('Error checking attendance date:', dateCheckError);
-      return false;
-    }
-    
-    // If no record for today, add one
-    if (!existingDate || existingDate.length === 0) {
-      console.log('First attendance today, adding date record');
-      
-      const { error: dateError } = await supabase
-        .from('attendance_dates')
-        .insert({
-          employee_id: employeeId,
-          date: today
-        });
-        
-      if (dateError) {
-        console.error('Error recording attendance date:', dateError);
-        return false;
-      }
-      
-      // For updating total_attendance, we'll use a direct +1 instead of RPC
-      const { data: employeeData, error: getEmployeeError } = await supabase
-        .from('employees')
-        .select('total_attendance')
-        .eq('id', employeeId)
-        .single();
-        
-      if (getEmployeeError) {
-        console.error('Error getting employee data:', getEmployeeError);
-        return false;
-      }
-      
-      const currentCount = employeeData?.total_attendance || 0;
-      
-      // Update total attendance count
-      const { error: updateError } = await supabase
-        .from('employees')
-        .update({ 
-          total_attendance: currentCount + 1,
-          last_attendance_time: new Date().toISOString()
-        })
-        .eq('id', employeeId);
-        
-      if (updateError) {
-        console.error('Error updating attendance count:', updateError);
-        return false;
-      }
     }
     
     console.log('Attendance recorded successfully');
@@ -310,7 +227,7 @@ export async function recordAttendance(employeeId: string, status: string = 'pre
   }
 }
 
-// Store unrecognized face
+// Store unrecognized face - using face_profiles with null user
 export async function storeUnrecognizedFace(imageData: string): Promise<boolean> {
   try {
     console.log('Storing unrecognized face');
@@ -320,17 +237,27 @@ export async function storeUnrecognizedFace(imageData: string): Promise<boolean>
       timestamp: new Date().toISOString()
     };
     
+    // Store in face_profiles with null user_id to mark as unrecognized
     const { error } = await supabase
-      .from('unrecognized_faces')
+      .from('face_profiles')
       .insert({
-        image_data: imageData,
-        device_info: deviceInfo
+        user_id: null,
+        face_data: imageData
       });
       
     if (error) {
       console.error('Error storing unrecognized face:', error);
       return false;
     }
+    
+    // Also record in attendance_records as unauthorized
+    await supabase
+      .from('attendance_records')
+      .insert({
+        user_id: null,
+        status: 'unauthorized',
+        device_info: deviceInfo
+      });
     
     console.log('Unrecognized face stored successfully');
     return true;

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import PageLayout from '@/components/layouts/PageLayout';
@@ -15,6 +16,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { loadModels, getFaceDescriptor, registerFace } from '@/services/FaceRecognitionService';
+import { supabase } from '@/integrations/supabase/client';
 
 const Register = () => {
   const { toast } = useToast();
@@ -118,9 +120,28 @@ const Register = () => {
     
     try {
       console.log('Submitting registration data');
-      // Register face with Supabase
+      
+      // Create a user ID - in a real app, this might be a UUID or user authentication ID
+      // For this example, we'll use the employeeId as the user ID
+      const userId = formData.employeeId;
+      
+      // First, create or update profile in the profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: userId,
+          username: formData.name,
+          updated_at: new Date().toISOString()
+        });
+        
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+        throw new Error('Failed to create user profile');
+      }
+      
+      // Register face with our service
       const success = await registerFace(
-        formData.employeeId,
+        userId,
         faceDescriptor,
         {
           name: formData.name,
@@ -389,7 +410,6 @@ const Register = () => {
                   ) : (
                     <div className="flex flex-col items-center">
                       <Webcam
-                        ref={webcamRef}
                         onCapture={handleCaptureImage}
                         className="max-w-md w-full"
                         overlayClassName={faceImage ? "border-green-500" : ""}
