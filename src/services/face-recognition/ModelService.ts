@@ -10,9 +10,9 @@ export async function loadModels() {
   try {
     console.log('Loading face recognition models from /models...');
     
-    // Force use of specific model versions to prevent shape mismatch errors
-    await faceapi.nets.ssdMobilenetv1.load('/models');
-    console.log('SSD Mobilenet model loaded successfully');
+    // Use TinyFaceDetector instead of SSDMobilenetv1
+    await faceapi.nets.tinyFaceDetector.load('/models');
+    console.log('TinyFaceDetector model loaded successfully');
     
     await faceapi.nets.faceLandmark68Net.load('/models');
     console.log('Face landmark model loaded successfully');
@@ -53,7 +53,8 @@ export async function getFaceDescriptor(imageElement: HTMLImageElement | HTMLVid
     }
     
     console.log('Detecting face in image...');
-    const detections = await faceapi.detectSingleFace(imageElement)
+    // Use TinyFaceDetector instead of SSDMobilenetv1
+    const detections = await faceapi.detectSingleFace(imageElement, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
       .withFaceDescriptor();
     
