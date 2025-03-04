@@ -48,21 +48,28 @@ export const useFaceRecognition = () => {
   
   // Function to capture and process face from video or image
   const processFace = async (mediaElement: HTMLVideoElement | HTMLImageElement): Promise<FaceRecognitionResult | null> => {
-    if (isProcessing || isModelLoading) return null;
+    if (isProcessing || isModelLoading) {
+      console.log('Already processing or models still loading');
+      return null;
+    }
     
     try {
+      console.log('Starting face processing with', mediaElement instanceof HTMLVideoElement ? 'video' : 'image');
       setIsProcessing(true);
       setError(null);
       
       // Get face descriptor
+      console.log('Getting face descriptor...');
       const faceDescriptor = await getFaceDescriptor(mediaElement);
       
       if (!faceDescriptor) {
+        console.log('No face detected');
         setError('No face detected in the image');
         setIsProcessing(false);
         return null;
       }
       
+      console.log('Face descriptor obtained, recognizing face...');
       // Recognize face
       const recognitionResult = await recognizeFace(faceDescriptor);
       
@@ -113,8 +120,10 @@ export const useFaceRecognition = () => {
       
       setResult(result);
       setIsProcessing(false);
+      console.log('Face processing complete', result);
       return result;
     } catch (err) {
+      console.error('Error processing face:', err);
       setError('Error processing face: ' + (err instanceof Error ? err.message : String(err)));
       setIsProcessing(false);
       return null;

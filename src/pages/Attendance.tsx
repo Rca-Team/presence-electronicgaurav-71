@@ -9,7 +9,7 @@ import PageLayout from '@/components/layouts/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import useFaceRecognition from '@/hooks/useFaceRecognition';
-import { loadModels } from '@/services/FaceRecognitionService';
+import { loadModels } from '@/services/face-recognition/ModelService';
 
 const Attendance = () => {
   const { toast } = useToast();
@@ -167,10 +167,14 @@ const Attendance = () => {
     fetchStats();
   }, []);
   
-  const handleCapture = async (imageData: string) => {
-    if (!webcamRef.current || isProcessing || isModelLoading) return;
+  const handleCapture = async () => {
+    if (!webcamRef.current || isProcessing || isModelLoading) {
+      console.log('Cannot capture: webcam not ready, or processing in progress');
+      return;
+    }
     
     try {
+      console.log('Processing face recognition...');
       const recognitionResult = await processFace(webcamRef.current);
       
       if (!recognitionResult) {
@@ -182,23 +186,22 @@ const Attendance = () => {
         return;
       }
       
-      if (!recognitionResult.recognized) {
+      const displayStatus = recognitionResult.status === 'present' ? 'present' : 'unauthorized';
+      const statusMessage = displayStatus === 'present' ? 'present' : 'not authorized';
+      
+      if (recognitionResult.recognized) {
+        toast({
+          title: "Attendance Recorded",
+          description: `${recognitionResult.employee.name} marked as ${statusMessage} at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          variant: displayStatus === 'present' ? "default" : "destructive",
+        });
+      } else {
         toast({
           title: "Recognition Failed",
           description: "This person is not registered in the system.",
           variant: "destructive",
         });
-        return;
       }
-      
-      const displayStatus = recognitionResult.status === 'present' ? 'present' : 'unauthorized';
-      const statusMessage = displayStatus === 'present' ? 'present' : 'not authorized';
-      
-      toast({
-        title: "Attendance Recorded",
-        description: `${recognitionResult.employee.name} marked as ${statusMessage} at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-        variant: displayStatus === 'present' ? "default" : "destructive",
-      });
       
     } catch (err) {
       console.error('Face recognition error:', err);
@@ -224,7 +227,8 @@ const Attendance = () => {
             <h3 className="text-lg font-medium mb-4">Facial Recognition</h3>
             <div className="space-y-4">
               <Webcam
-                onCapture={handleCapture}
+                ref={webcamRef}
+                onCapture={() => handleCapture()}
                 className="w-full"
                 showControls={!isProcessing && !result}
                 autoStart={!result}

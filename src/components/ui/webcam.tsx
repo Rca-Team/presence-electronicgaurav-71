@@ -84,7 +84,11 @@ export function Webcam({
       
       // Call the onCapture callback with the image data
       if (onCapture) {
+        // Pass the video element directly for face-api.js
         onCapture(imageData);
+        
+        // Log for debugging
+        console.log('Image captured and passed to parent component');
       }
     }
   };
