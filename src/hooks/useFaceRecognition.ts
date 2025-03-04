@@ -1,12 +1,12 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import * as faceapi from 'face-api.js';
 import { loadModels, getFaceDescriptor, recognizeFace, storeUnrecognizedFace, recordAttendance } from '@/services/FaceRecognitionService';
 
 export interface FaceRecognitionResult {
   recognized: boolean;
   employee?: any;
-  status?: 'present' | 'late' | 'absent' | 'unauthorized';
+  status?: 'present' | 'unauthorized';  // Updated to match the database enum values
   confidence?: number;
   timestamp?: string;
 }
@@ -79,9 +79,8 @@ export const useFaceRecognition = () => {
         return result;
       }
       
-      // Determine status (present or late)
-      const currentHour = new Date().getHours();
-      const status = currentHour < 9 ? 'present' : 'late';
+      // Use 'present' status since 'late' is not a valid enum value in the database
+      const status = 'present';
       
       // Record attendance
       await recordAttendance(
@@ -95,7 +94,7 @@ export const useFaceRecognition = () => {
       const result = {
         recognized: true,
         employee: recognitionResult.employee,
-        status: status as 'present' | 'late',
+        status: status,
         confidence: recognitionResult.confidence,
         timestamp
       };

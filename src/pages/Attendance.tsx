@@ -54,30 +54,48 @@ const Attendance = () => {
   // Fetch recent attendance data
   useEffect(() => {
     const fetchRecentAttendance = async () => {
-      const { data, error } = await supabase
+      // First fetch attendance records
+      const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance_records')
-        .select(`
-          id,
-          status,
-          timestamp,
-          confidence_score,
-          profiles(username)
-        `)
+        .select('id, status, timestamp, confidence_score, user_id')
         .order('timestamp', { ascending: false })
         .limit(10);
         
-      if (error) {
-        console.error('Error fetching recent attendance:', error);
+      if (attendanceError) {
+        console.error('Error fetching recent attendance:', attendanceError);
         return;
       }
       
-      if (data) {
-        setRecentAttendance(data.map(record => ({
-          name: record.profiles?.username || 'Unknown',
-          time: new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          status: record.status.charAt(0).toUpperCase() + record.status.slice(1),
-          confidence: record.confidence_score
-        })));
+      if (attendanceData && attendanceData.length > 0) {
+        // For each attendance record with a user_id, get their profile
+        const enrichedData = await Promise.all(
+          attendanceData.map(async (record) => {
+            let username = 'Unknown';
+            
+            if (record.user_id) {
+              const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', record.user_id)
+                .maybeSingle();
+                
+              if (!profileError && profileData && profileData.username) {
+                username = profileData.username;
+              }
+            }
+            
+            return {
+              name: username,
+              time: new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              status: record.status === 'present' ? 'Present' : 'Unauthorized',
+              confidence: record.confidence_score
+            };
+          })
+        );
+        
+        setRecentAttendance(enrichedData);
+      } else {
+        setRecentAttendance([]);
       }
     };
     
@@ -132,20 +150,20 @@ const Attendance = () => {
       
       const presentUsers = presentData?.length || 0;
       
-      // Get late users today
-      const { data: lateData, error: lateError } = await supabase
+      // Get unauthorized users today (using as "late" for display purposes)
+      const { data: unauthorizedData, error: unauthorizedError } = await supabase
         .from('attendance_records')
         .select('id')
-        .eq('status', 'late')
+        .eq('status', 'unauthorized')
         .gte('timestamp', `${today}T00:00:00`)
         .lte('timestamp', `${today}T23:59:59`);
         
-      if (lateError) {
-        console.error('Error fetching late users:', lateError);
+      if (unauthorizedError) {
+        console.error('Error fetching unauthorized users:', unauthorizedError);
         return;
       }
       
-      const lateUsers = lateData?.length || 0;
+      const lateUsers = unauthorizedData?.length || 0;
       
       // Calculate absent users
       const absentUsers = Math.max(0, totalProfiles - presentUsers - lateUsers);
@@ -186,11 +204,14 @@ const Attendance = () => {
         return;
       }
       
-      // Person recognized
+      // Person recognized - note: the status can only be 'present' or 'unauthorized' based on db schema
+      const displayStatus = recognitionResult.status === 'present' ? 'present' : 'unauthorized';
+      const statusMessage = displayStatus === 'present' ? 'present' : 'not authorized';
+      
       toast({
         title: "Attendance Recorded",
-        description: `${recognitionResult.employee.name} marked as ${recognitionResult.status} at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-        variant: recognitionResult.status === 'late' ? "destructive" : "default",
+        description: `${recognitionResult.employee.name} marked as ${statusMessage} at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        variant: displayStatus === 'present' ? "default" : "destructive",
       });
       
     } catch (err) {

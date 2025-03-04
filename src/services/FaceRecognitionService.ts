@@ -199,6 +199,9 @@ export async function recordAttendance(userId: string, status: string = 'present
   try {
     console.log('Recording attendance for user ID:', userId);
     
+    // Make sure status is one of the allowed values (present or unauthorized)
+    const validStatus = status === 'present' ? 'present' : 'unauthorized';
+    
     const deviceInfo = {
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString()
@@ -209,7 +212,7 @@ export async function recordAttendance(userId: string, status: string = 'present
       .from('attendance_records')
       .insert({
         user_id: userId,
-        status: status as any, // Type casting since we're using a string
+        status: validStatus,
         confidence_score: confidence,
         device_info: deviceInfo
       });
