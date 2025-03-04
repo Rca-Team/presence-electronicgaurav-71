@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { PageHeader } from '@/components/ui/page-header';
@@ -18,7 +17,7 @@ const Attendance = () => {
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const [stats, setStats] = useState({
     present: 0,
-    late: 0,
+    unauthorized: 0,
     absent: 0,
     total: 0
   });
@@ -32,11 +31,9 @@ const Attendance = () => {
     resetResult
   } = useFaceRecognition();
   
-  // Load face-api models
   useEffect(() => {
     const initModels = async () => {
       try {
-        // Create a /public/models directory and add the face-api.js models there
         await loadModels();
       } catch (err) {
         console.error('Error loading face recognition models:', err);
@@ -51,10 +48,8 @@ const Attendance = () => {
     initModels();
   }, [toast]);
   
-  // Fetch recent attendance data
   useEffect(() => {
     const fetchRecentAttendance = async () => {
-      // First fetch attendance records
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance_records')
         .select('id, status, timestamp, confidence_score, user_id')
@@ -67,19 +62,18 @@ const Attendance = () => {
       }
       
       if (attendanceData && attendanceData.length > 0) {
-        // For each attendance record with a user_id, get their profile
         const enrichedData = await Promise.all(
           attendanceData.map(async (record) => {
             let username = 'Unknown';
             
             if (record.user_id) {
-              const { data: profileData, error: profileError } = await supabase
+              const { data: profileData } = await supabase
                 .from('profiles')
                 .select('username')
                 .eq('id', record.user_id)
                 .maybeSingle();
                 
-              if (!profileError && profileData && profileData.username) {
+              if (profileData && profileData.username) {
                 username = profileData.username;
               }
             }
@@ -101,7 +95,6 @@ const Attendance = () => {
     
     fetchRecentAttendance();
     
-    // Set up real-time subscription for new attendance records
     const subscription = supabase
       .channel('attendance_changes')
       .on('postgres_changes', { 
@@ -118,12 +111,10 @@ const Attendance = () => {
     };
   }, []);
   
-  // Fetch attendance statistics
   useEffect(() => {
     const fetchStats = async () => {
       const today = new Date().toISOString().split('T')[0];
       
-      // Get total profiles (users)
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id');
@@ -135,7 +126,6 @@ const Attendance = () => {
       
       const totalProfiles = profilesData?.length || 0;
       
-      // Get present users today
       const { data: presentData, error: presentError } = await supabase
         .from('attendance_records')
         .select('id')
@@ -150,7 +140,6 @@ const Attendance = () => {
       
       const presentUsers = presentData?.length || 0;
       
-      // Get unauthorized users today (using as "late" for display purposes)
       const { data: unauthorizedData, error: unauthorizedError } = await supabase
         .from('attendance_records')
         .select('id')
@@ -163,14 +152,13 @@ const Attendance = () => {
         return;
       }
       
-      const lateUsers = unauthorizedData?.length || 0;
+      const unauthorizedUsers = unauthorizedData?.length || 0;
       
-      // Calculate absent users
-      const absentUsers = Math.max(0, totalProfiles - presentUsers - lateUsers);
+      const absentUsers = Math.max(0, totalProfiles - presentUsers - unauthorizedUsers);
       
       setStats({
         present: presentUsers,
-        late: lateUsers,
+        unauthorized: unauthorizedUsers,
         absent: absentUsers,
         total: totalProfiles
       });
@@ -179,7 +167,6 @@ const Attendance = () => {
     fetchStats();
   }, []);
   
-  // Handle face recognition capture
   const handleCapture = async (imageData: string) => {
     if (!webcamRef.current || isProcessing || isModelLoading) return;
     
@@ -204,7 +191,6 @@ const Attendance = () => {
         return;
       }
       
-      // Person recognized - note: the status can only be 'present' or 'unauthorized' based on db schema
       const displayStatus = recognitionResult.status === 'present' ? 'present' : 'unauthorized';
       const statusMessage = displayStatus === 'present' ? 'present' : 'not authorized';
       
@@ -288,8 +274,6 @@ const Attendance = () => {
                     <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
                       result.status === 'present' 
                         ? 'bg-green-500' 
-                        : result.status === 'late'
-                        ? 'bg-yellow-500'
                         : 'bg-destructive'
                     }`}></span>
                     {result.status === 'unauthorized' 
@@ -430,8 +414,8 @@ const Attendance = () => {
               
               <StatCard
                 title="Late Arrivals"
-                value={String(stats.late)}
-                description={stats.total > 0 ? `${Math.round((stats.late / stats.total) * 100)}% of total profiles` : '0% of total profiles'}
+                value={String(stats.unauthorized)}
+                description={stats.total > 0 ? `${Math.round((stats.unauthorized / stats.total) * 100)}% of total profiles` : '0% of total profiles'}
                 className="mb-4"
               />
               

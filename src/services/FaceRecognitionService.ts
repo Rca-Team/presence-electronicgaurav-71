@@ -11,20 +11,27 @@ export async function loadModels() {
   try {
     console.log('Loading face recognition models from /models...');
     
-    // Load models one by one with explicit progress logging
-    await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
-    console.log('SSD Mobilenet model loaded');
+    // Force use of specific model versions to prevent shape mismatch errors
+    await faceapi.nets.ssdMobilenetv1.load('/models');
+    console.log('SSD Mobilenet model loaded successfully');
     
-    await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-    console.log('Face landmark model loaded');
+    await faceapi.nets.faceLandmark68Net.load('/models');
+    console.log('Face landmark model loaded successfully');
     
-    await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-    console.log('Face recognition model loaded');
+    await faceapi.nets.faceRecognitionNet.load('/models');
+    console.log('Face recognition model loaded successfully');
     
     modelsLoaded = true;
     console.log('All face recognition models loaded successfully');
   } catch (error) {
     console.error('Error loading face recognition models:', error);
+    // Add more detailed error logging
+    if (error instanceof Error) {
+      console.error('Model loading error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+    }
     throw error;
   }
 }
@@ -164,7 +171,7 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
         .from('profiles')
         .select('*')
         .eq('id', bestMatch.userId)
-        .single();
+        .maybeSingle();
         
       if (profileError || !profile) {
         console.error('Error fetching profile details:', profileError);
@@ -195,12 +202,13 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
 }
 
 // Record attendance
-export async function recordAttendance(userId: string, status: string = 'present', confidence: number = 100): Promise<boolean> {
+export async function recordAttendance(
+  userId: string, 
+  status: 'present' | 'unauthorized' = 'present', 
+  confidence: number = 100
+): Promise<boolean> {
   try {
     console.log('Recording attendance for user ID:', userId);
-    
-    // Make sure status is one of the allowed values (present or unauthorized)
-    const validStatus = status === 'present' ? 'present' : 'unauthorized';
     
     const deviceInfo = {
       userAgent: navigator.userAgent,
@@ -212,7 +220,7 @@ export async function recordAttendance(userId: string, status: string = 'present
       .from('attendance_records')
       .insert({
         user_id: userId,
-        status: validStatus,
+        status: status,
         confidence_score: confidence,
         device_info: deviceInfo
       });

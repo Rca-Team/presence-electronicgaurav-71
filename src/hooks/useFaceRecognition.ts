@@ -6,7 +6,7 @@ import { loadModels, getFaceDescriptor, recognizeFace, storeUnrecognizedFace, re
 export interface FaceRecognitionResult {
   recognized: boolean;
   employee?: any;
-  status?: 'present' | 'unauthorized';  // Updated to match the database enum values
+  status?: 'present' | 'unauthorized';  // Strictly typing this to match the database enum values
   confidence?: number;
   timestamp?: string;
 }
@@ -69,9 +69,9 @@ export const useFaceRecognition = () => {
           await storeUnrecognizedFace(imageData);
         }
         
-        const result = {
+        const result: FaceRecognitionResult = {
           recognized: false,
-          status: 'unauthorized' as const
+          status: 'unauthorized'
         };
         
         setResult(result);
@@ -80,7 +80,7 @@ export const useFaceRecognition = () => {
       }
       
       // Use 'present' status since 'late' is not a valid enum value in the database
-      const status = 'present';
+      const status: 'present' | 'unauthorized' = 'present';
       
       // Record attendance
       await recordAttendance(
@@ -91,7 +91,7 @@ export const useFaceRecognition = () => {
       
       const timestamp = new Date().toISOString();
       
-      const result = {
+      const result: FaceRecognitionResult = {
         recognized: true,
         employee: recognitionResult.employee,
         status: status,
