@@ -1,7 +1,12 @@
-
 import { useState, useEffect } from 'react';
 import * as faceapi from 'face-api.js';
-import { loadModels, getFaceDescriptor, recognizeFace, storeUnrecognizedFace, recordAttendance } from '@/services/FaceRecognitionService';
+import { 
+  loadModels, 
+  getFaceDescriptor, 
+  recognizeFace, 
+  storeUnrecognizedFace, 
+  recordAttendance 
+} from '@/services/FaceRecognitionService';
 
 export interface FaceRecognitionResult {
   recognized: boolean;
