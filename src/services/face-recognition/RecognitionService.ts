@@ -38,8 +38,8 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
     const bestMatch = faceMatchers[0];
     
     // If distance is below threshold, consider it a match (lower is better)
-    // Typical threshold is 0.5-0.6
-    const MATCH_THRESHOLD = 0.6;
+    // Lowering the threshold for better recognition
+    const MATCH_THRESHOLD = 0.5;
     console.log(`Best match distance: ${bestMatch.distance}, threshold: ${MATCH_THRESHOLD}`);
     
     if (bestMatch.distance <= MATCH_THRESHOLD) {

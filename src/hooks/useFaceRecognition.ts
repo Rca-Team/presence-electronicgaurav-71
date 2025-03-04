@@ -1,12 +1,17 @@
+
 import { useState, useEffect } from 'react';
 import * as faceapi from 'face-api.js';
 import { 
   loadModels, 
-  getFaceDescriptor, 
-  recognizeFace, 
-  storeUnrecognizedFace, 
-  recordAttendance 
-} from '@/services/FaceRecognitionService';
+  getFaceDescriptor 
+} from '@/services/face-recognition/ModelService';
+import {
+  recognizeFace,
+  recordAttendance
+} from '@/services/face-recognition/RecognitionService';
+import {
+  storeUnrecognizedFace
+} from '@/services/face-recognition/RegistrationService';
 
 export interface FaceRecognitionResult {
   recognized: boolean;
@@ -29,6 +34,7 @@ export const useFaceRecognition = () => {
         setIsModelLoading(true);
         await loadModels();
         setIsModelLoading(false);
+        console.log('Models loaded successfully');
       } catch (err) {
         console.error('Error loading face recognition models:', err);
         setError('Failed to load face recognition models');
@@ -36,6 +42,7 @@ export const useFaceRecognition = () => {
       }
     };
     
+    console.log('Starting model initialization');
     initializeModels();
   }, []);
   
@@ -84,7 +91,7 @@ export const useFaceRecognition = () => {
         return result;
       }
       
-      // Use 'present' status since 'late' is not a valid enum value in the database
+      // Use 'present' status for recognized faces
       const status: 'present' | 'unauthorized' = 'present';
       
       // Record attendance

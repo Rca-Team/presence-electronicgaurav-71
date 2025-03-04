@@ -10,7 +10,7 @@ export async function loadModels() {
   try {
     console.log('Loading face recognition models from /models...');
     
-    // Use TinyFaceDetector instead of SSDMobilenetv1
+    // Use TinyFaceDetector for faster performance
     await faceapi.nets.tinyFaceDetector.load('/models');
     console.log('TinyFaceDetector model loaded successfully');
     
@@ -53,8 +53,13 @@ export async function getFaceDescriptor(imageElement: HTMLImageElement | HTMLVid
     }
     
     console.log('Detecting face in image...');
-    // Use TinyFaceDetector instead of SSDMobilenetv1
-    const detections = await faceapi.detectSingleFace(imageElement, new faceapi.TinyFaceDetectorOptions())
+    // Use TinyFaceDetector with proper options and detectionMethod
+    const detectionOptions = new faceapi.TinyFaceDetectorOptions({ 
+      inputSize: 416, 
+      scoreThreshold: 0.5 
+    });
+    
+    const detections = await faceapi.detectSingleFace(imageElement, detectionOptions)
       .withFaceLandmarks()
       .withFaceDescriptor();
     
