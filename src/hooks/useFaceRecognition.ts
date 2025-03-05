@@ -58,14 +58,26 @@ export const useFaceRecognition = () => {
       setIsProcessing(true);
       setError(null);
       
-      // Get face descriptor
-      console.log('Getting face descriptor from', mediaElement);
+      // Log media information for debugging
       console.log('Media dimensions:', mediaElement.width || 'unknown width', 'x', mediaElement.height || 'unknown height');
       
       if (mediaElement instanceof HTMLVideoElement) {
         console.log('Video state:', mediaElement.readyState, 'Video dimensions:', mediaElement.videoWidth, 'x', mediaElement.videoHeight);
+        
+        // Check if video is ready and has dimensions
+        if (mediaElement.readyState < 2 || mediaElement.videoWidth === 0) {
+          console.log('Video not ready for processing, retrying...');
+          await new Promise(resolve => setTimeout(resolve, 500)); // Wait a bit and check again
+          
+          if (mediaElement.readyState < 2 || mediaElement.videoWidth === 0) {
+            setError('Video stream not ready. Please try again.');
+            setIsProcessing(false);
+            return null;
+          }
+        }
       }
       
+      // Get face descriptor
       const faceDescriptor = await getFaceDescriptor(mediaElement);
       
       if (!faceDescriptor) {
@@ -76,7 +88,7 @@ export const useFaceRecognition = () => {
       }
       
       console.log('Face descriptor obtained, recognizing face...');
-      // Recognize face
+      // Recognize face using our updated recognizeFace function with FaceMatcher
       const recognitionResult = await recognizeFace(faceDescriptor);
       
       if (!recognitionResult.recognized) {
