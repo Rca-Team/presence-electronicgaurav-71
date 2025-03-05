@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import * as faceapi from 'face-api.js';
 import { 
@@ -28,7 +27,6 @@ export const useFaceRecognition = () => {
   const [result, setResult] = useState<FaceRecognitionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   
-  // Initialize models on mount
   useEffect(() => {
     const initializeModels = async () => {
       try {
@@ -47,7 +45,6 @@ export const useFaceRecognition = () => {
     initializeModels();
   }, []);
   
-  // Function to capture and process face from video or image
   const processFace = async (mediaElement: HTMLVideoElement | HTMLImageElement): Promise<FaceRecognitionResult | null> => {
     if (isProcessing || isModelLoading) {
       console.log('Already processing or models still loading');
@@ -59,16 +56,14 @@ export const useFaceRecognition = () => {
       setIsProcessing(true);
       setError(null);
       
-      // Log media information for debugging
       console.log('Media dimensions:', mediaElement.width || 'unknown width', 'x', mediaElement.height || 'unknown height');
       
       if (mediaElement instanceof HTMLVideoElement) {
         console.log('Video state:', mediaElement.readyState, 'Video dimensions:', mediaElement.videoWidth, 'x', mediaElement.videoHeight);
         
-        // Check if video is ready and has dimensions
         if (mediaElement.readyState < 2 || mediaElement.videoWidth === 0) {
           console.log('Video not ready for processing, retrying...');
-          await new Promise(resolve => setTimeout(resolve, 500)); // Wait a bit and check again
+          await new Promise(resolve => setTimeout(resolve, 500));
           
           if (mediaElement.readyState < 2 || mediaElement.videoWidth === 0) {
             setError('Video stream not ready. Please try again.');
@@ -78,7 +73,6 @@ export const useFaceRecognition = () => {
         }
       }
       
-      // Get face descriptor
       const faceDescriptor = await getFaceDescriptor(mediaElement);
       
       if (!faceDescriptor) {
@@ -89,25 +83,21 @@ export const useFaceRecognition = () => {
       }
       
       console.log('Face descriptor obtained, recognizing face...');
-      // Recognize face using our updated recognizeFace function with FaceMatcher
       const recognitionResult = await recognizeFace(faceDescriptor);
       
       if (!recognitionResult.recognized) {
-        // Store unrecognized face if it's from a video element (webcam)
         let imageUrl;
         if (mediaElement instanceof HTMLVideoElement) {
-          // Create a canvas to capture the image
           const canvas = document.createElement('canvas');
           canvas.width = mediaElement.videoWidth;
           canvas.height = mediaElement.videoHeight;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(mediaElement, 0, 0, canvas.width, canvas.height);
           
-          // Get image data as base64
           const imageData = canvas.toDataURL('image/png');
           await storeUnrecognizedFace(imageData);
           
-          // The URL will be stored in Firebase by storeUnrecognizedFace
+          imageUrl = imageData;
         }
         
         const result: FaceRecognitionResult = {
@@ -121,10 +111,8 @@ export const useFaceRecognition = () => {
         return result;
       }
       
-      // Use 'present' status for recognized faces
       const status: 'present' | 'unauthorized' = 'present';
       
-      // Record attendance
       await recordAttendance(
         recognitionResult.employee.id, 
         status, 

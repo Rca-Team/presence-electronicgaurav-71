@@ -1,85 +1,90 @@
 
-import { supabase } from '@/integrations/supabase/client';
 import * as faceapi from 'face-api.js';
+import { supabase } from '@/integrations/supabase/client';
 import { stringToDescriptor } from './ModelService';
 
-// Recognize a face from the database using FaceMatcher
+// New approach: Recognize face from attendance records metadata instead of face_profiles
 export async function recognizeFace(faceDescriptor: Float32Array): Promise<{ 
-  recognized: boolean; 
+  recognized: boolean;
   employee?: any;
-  confidence?: number; 
+  confidence?: number;
 }> {
   try {
-    console.log('Attempting to recognize face with FaceMatcher...');
-    // Get all face encodings from the database
-    const { data: encodings, error: encodingsError } = await supabase
-      .from('face_profiles')
-      .select('face_data, user_id');
-      
-    if (encodingsError || !encodings || encodings.length === 0) {
-      console.error('Error fetching face data:', encodingsError);
+    console.log('Attempting to recognize face...');
+    
+    // Get all attendance records with registration=true
+    const { data: registrations, error } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .eq('status', 'registered');
+    
+    if (error || !registrations || registrations.length === 0) {
+      console.log('No registered faces found:', error);
       return { recognized: false };
     }
     
-    console.log(`Retrieved ${encodings.length} face profiles for comparison`);
+    console.log(`Found ${registrations.length} registered faces to compare against`);
     
-    // Convert encodings to face descriptors and create labeled face descriptors
-    const labeledFaceDescriptors = encodings
-      .filter(entry => entry.user_id) // Filter out null user_ids
-      .map(entry => {
-        const descriptor = stringToDescriptor(entry.face_data);
-        // Create a labeled face descriptor for the FaceMatcher
-        return new faceapi.LabeledFaceDescriptors(
-          entry.user_id, 
-          [descriptor] // Array of descriptors (just one in this case)
-        );
-      });
+    // Array to store matches with confidence scores
+    const matches: Array<{ employee: any; confidence: number }> = [];
     
-    if (labeledFaceDescriptors.length === 0) {
-      console.log('No valid face profiles found in database');
-      return { recognized: false };
-    }
-    
-    // Create a FaceMatcher with labeled descriptors
-    // Using a lower distance threshold for better accuracy (0.5 is default)
-    const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.5);
-    
-    // Find best match for the face descriptor
-    const bestMatch = faceMatcher.findBestMatch(faceDescriptor);
-    
-    console.log(`Best match: ${bestMatch.label} with distance: ${bestMatch.distance}`);
-    
-    // If the best match is not 'unknown', we have a match
-    if (bestMatch.label !== 'unknown') {
-      // Get profile details
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', bestMatch.label)
-        .maybeSingle();
-        
-      if (profileError || !profile) {
-        console.error('Error fetching profile details:', profileError);
-        return { recognized: false };
+    // Loop through registrations and compare face descriptors
+    for (const registration of registrations) {
+      // Skip if device_info or metadata is missing
+      if (!registration.device_info || !registration.device_info.metadata) {
+        continue;
       }
       
-      // Calculate confidence score (convert distance to a 0-100 scale)
-      // Lower distance means higher confidence
-      const confidence = Math.max(0, Math.min(100, (1 - bestMatch.distance) * 100));
-      console.log(`User recognized: ${profile.username} with ${confidence.toFixed(2)}% confidence`);
+      const metadata = registration.device_info.metadata;
       
-      return { 
-        recognized: true, 
-        employee: {
-          id: profile.id,
-          name: profile.username,
-          avatar_url: profile.avatar_url
-        },
-        confidence
+      // Skip if face descriptor is missing
+      if (!metadata.face_descriptor) {
+        continue;
+      }
+      
+      // Convert stored descriptor back to Float32Array
+      const storedDescriptor = stringToDescriptor(metadata.face_descriptor);
+      
+      // Calculate distance between current face and stored face
+      const distance = faceapi.euclideanDistance(faceDescriptor, storedDescriptor);
+      
+      // Convert distance to confidence (1.0 - distance), lower distance = higher confidence
+      const confidence = Math.max(0, 1 - distance);
+      
+      console.log(`Face comparison result - Distance: ${distance}, Confidence: ${confidence}`);
+      
+      // If confidence is above threshold, consider it a match
+      if (confidence > 0.6) {
+        matches.push({
+          employee: {
+            id: registration.device_info.employee_id,
+            name: metadata.name,
+            department: metadata.department,
+            position: metadata.position,
+            employee_id: metadata.employee_id,
+            firebase_image_url: metadata.firebase_image_url
+          },
+          confidence
+        });
+      }
+    }
+    
+    // If we have matches, return the one with highest confidence
+    if (matches.length > 0) {
+      // Sort by confidence (highest first)
+      matches.sort((a, b) => b.confidence - a.confidence);
+      
+      const bestMatch = matches[0];
+      console.log('Face recognized successfully:', bestMatch.employee.name);
+      
+      return {
+        recognized: true,
+        employee: bestMatch.employee,
+        confidence: bestMatch.confidence
       };
     }
     
-    console.log('No match found for the face');
+    console.log('No matching face found above confidence threshold');
     return { recognized: false };
   } catch (error) {
     console.error('Error recognizing face:', error);
@@ -87,39 +92,34 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
   }
 }
 
-// Record attendance
+// Record attendance in the database
 export async function recordAttendance(
   userId: string, 
-  status: 'present' | 'unauthorized' = 'present', 
-  confidence: number = 100
+  status: 'present' | 'unauthorized',
+  confidenceScore: number = 1.0
 ): Promise<boolean> {
   try {
-    console.log('Recording attendance for user ID:', userId);
-    
-    const deviceInfo = {
-      userAgent: navigator.userAgent,
-      timestamp: new Date().toISOString()
-    };
-    
-    // Record attendance
-    const { error: attendanceError } = await supabase
+    const { error } = await supabase
       .from('attendance_records')
       .insert({
         user_id: userId,
-        status: status,
-        confidence_score: confidence,
-        device_info: deviceInfo
+        status,
+        confidence_score: confidenceScore,
+        device_info: {
+          userAgent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        }
       });
-      
-    if (attendanceError) {
-      console.error('Error recording attendance:', attendanceError);
+    
+    if (error) {
+      console.error('Error recording attendance:', error);
       return false;
     }
     
     console.log('Attendance recorded successfully');
     return true;
   } catch (error) {
-    console.error('Error recording attendance:', error);
+    console.error('Error in recordAttendance function:', error);
     return false;
   }
 }

@@ -45,20 +45,8 @@ export async function registerFace(
       }
     }
     
-    // Store face data in the face_profiles table first - without foreign key constraints
-    const { error } = await supabase
-      .from('face_profiles')
-      .insert({
-        user_id: employeeId, 
-        face_data: descriptorToString(faceDescriptor)
-      });
-      
-    if (error) {
-      console.error('Error storing face data:', error);
-      return false;
-    }
-    
-    console.log('Face data stored successfully');
+    // Skip storing in face_profiles due to foreign key constraint issues
+    // Instead, only record in attendance_records which has looser constraints
     
     // Store employee metadata in a transaction record
     const metadataRecord = {
@@ -70,27 +58,29 @@ export async function registerFace(
       standing: employeeData.standing,
       starting_year: employeeData.starting_year,
       firebase_image_url: firebaseImageUrl,
-      name: employeeData.name
+      name: employeeData.name,
+      face_descriptor: descriptorToString(faceDescriptor) // Store face descriptor in metadata
     };
     
     // Record attendance to mark registration
     const { error: attendanceError } = await supabase
       .from('attendance_records')
       .insert({
-        user_id: employeeId,
-        status: 'present',
+        user_id: null, // Use null to avoid foreign key constraints
+        status: 'registered', // Use 'registered' to differentiate from actual attendance
         device_info: {
           userAgent: navigator.userAgent,
           timestamp: new Date().toISOString(),
           registration: true,
-          metadata: metadataRecord
+          metadata: metadataRecord,
+          employee_id: employeeId // Store the generated UUID here
         },
         confidence_score: 1.0
       });
     
     if (attendanceError) {
-      console.error('Error recording initial attendance:', attendanceError);
-      // Don't return false here, as the face data was successfully stored
+      console.error('Error recording registration:', attendanceError);
+      return false;
     }
     
     console.log('Face registration completed successfully');
@@ -134,27 +124,20 @@ export async function storeUnrecognizedFace(imageData: string): Promise<boolean>
       firebase_image_url: firebaseImageUrl
     };
     
-    // Store in face_profiles with null user_id to mark as unrecognized
+    // Skip storing in face_profiles due to constraints
+    // Instead, use attendance_records with unauthorized status
     const { error } = await supabase
-      .from('face_profiles')
-      .insert({
-        user_id: null,
-        face_data: imageData
-      });
-      
-    if (error) {
-      console.error('Error storing unrecognized face:', error);
-      return false;
-    }
-    
-    // Also record in attendance_records as unauthorized
-    await supabase
       .from('attendance_records')
       .insert({
         user_id: null,
         status: 'unauthorized',
         device_info: deviceInfo
       });
+      
+    if (error) {
+      console.error('Error storing unrecognized face:', error);
+      return false;
+    }
     
     console.log('Unrecognized face stored successfully');
     return true;
