@@ -45,12 +45,27 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
     }
     
     // Filter to only include registration records
-    const registrationRecords = registrations.filter(record => 
-      record.device_info && 
-      record.device_info.registration === true &&
-      record.device_info.metadata && 
-      record.device_info.metadata.face_descriptor
-    );
+    const registrationRecords = registrations.filter(record => {
+      // First check if device_info exists and is an object
+      if (!record.device_info || typeof record.device_info !== 'object') {
+        return false;
+      }
+      
+      // Now safely cast device_info to our interface
+      const deviceInfo = record.device_info as any;
+      
+      // Check if registration exists and is true
+      if (!deviceInfo.registration) {
+        return false;
+      }
+      
+      // Check if metadata exists and contains face_descriptor
+      if (!deviceInfo.metadata || !deviceInfo.metadata.face_descriptor) {
+        return false;
+      }
+      
+      return true;
+    });
     
     if (registrationRecords.length === 0) {
       console.log('No face registration records found in the database');
@@ -65,17 +80,7 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
     // Loop through registrations and compare face descriptors
     for (const registration of registrationRecords) {
       // Safely cast device_info to our interface
-      const deviceInfo = registration.device_info as DeviceInfo;
-      
-      // Skip if metadata is missing
-      if (!deviceInfo.metadata) {
-        continue;
-      }
-      
-      // Skip if face descriptor is missing
-      if (!deviceInfo.metadata.face_descriptor) {
-        continue;
-      }
+      const deviceInfo = registration.device_info as any;
       
       try {
         // Convert stored descriptor back to Float32Array
