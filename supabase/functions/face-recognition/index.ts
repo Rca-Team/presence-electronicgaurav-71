@@ -14,13 +14,39 @@ serve(async (req) => {
   }
   
   try {
+    // Log the environment variables (safely)
+    console.log('SUPABASE_URL available:', !!Deno.env.get('SUPABASE_URL'));
+    console.log('SUPABASE_ANON_KEY available:', !!Deno.env.get('SUPABASE_ANON_KEY'));
+    
+    // Create Supabase client with fallback values if needed
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://ulqeiwqodhltoibeqzlp.supabase.co';
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscWVpd3FvZGhsdG9pYmVxemxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNzA5MjgsImV4cCI6MjA1Njc0NjkyOH0.tEcTfAx4nisb_SaHE1GNAEcfLwbLgNJMXHrTw8wpGw0';
+    
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      supabaseUrl,
+      supabaseKey,
+      { global: { headers: { Authorization: req.headers.get('Authorization') || '' } } }
     )
     
-    const { operation } = await req.json()
+    // Parse request body with error handling
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid JSON in request body',
+          details: parseError.message
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+    
+    const { operation } = requestData;
     
     // Health check endpoint for model status
     if (operation === 'healthCheck') {
@@ -46,7 +72,10 @@ serve(async (req) => {
         .from('employees')
         .select('id')
       
-      if (employeesError) throw employeesError
+      if (employeesError) {
+        console.error('Error fetching employees:', employeesError);
+        throw employeesError;
+      }
       
       const totalEmployees = employeesData?.length || 0
       
@@ -56,7 +85,10 @@ serve(async (req) => {
         .select('id')
         .eq('date', today)
       
-      if (presentError) throw presentError
+      if (presentError) {
+        console.error('Error fetching present employees:', presentError);
+        throw presentError;
+      }
       
       const presentEmployees = presentData?.length || 0
       
@@ -68,7 +100,10 @@ serve(async (req) => {
         .gte('timestamp', `${today}T00:00:00`)
         .lte('timestamp', `${today}T23:59:59`)
       
-      if (lateError) throw lateError
+      if (lateError) {
+        console.error('Error fetching late employees:', lateError);
+        throw lateError;
+      }
       
       const lateEmployees = lateData?.length || 0
       
@@ -93,9 +128,8 @@ serve(async (req) => {
     }
     
     // Handler for future operations
-    
     return new Response(
-      JSON.stringify({ error: 'Unknown operation' }),
+      JSON.stringify({ error: 'Unknown operation', requestedOperation: operation }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -106,9 +140,9 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: error.message || 'Unknown error',
         timestamp: new Date().toISOString(),
-        details: error.stack
+        details: error.stack || 'No stack trace available'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

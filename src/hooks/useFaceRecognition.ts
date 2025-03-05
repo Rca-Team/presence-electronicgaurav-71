@@ -27,25 +27,37 @@ export const useFaceRecognition = () => {
   const [isModelLoading, setIsModelLoading] = useState<boolean>(true);
   const [result, setResult] = useState<FaceRecognitionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [modelsLoaded, setModelsLoaded] = useState<boolean>(false);
   
   useEffect(() => {
     const initializeModels = async () => {
+      if (modelsLoaded) return;
+      
       try {
         setIsModelLoading(true);
         console.log('Starting to load face recognition models...');
         await loadModels();
         setIsModelLoading(false);
+        setModelsLoaded(true);
         console.log('Models loaded successfully');
       } catch (err) {
         console.error('Error loading face recognition models:', err);
-        setError('Failed to load face recognition models');
+        setError('Failed to load face recognition models: ' + (err instanceof Error ? err.message : String(err)));
         setIsModelLoading(false);
+        
+        // Retry loading after 3 seconds in case of network issues
+        setTimeout(() => {
+          if (!modelsLoaded) {
+            console.log('Retrying model loading...');
+            setModelsLoaded(false);
+          }
+        }, 3000);
       }
     };
     
     console.log('Starting model initialization');
     initializeModels();
-  }, []);
+  }, [modelsLoaded]);
   
   const processFace = async (mediaElement: HTMLVideoElement | HTMLImageElement): Promise<FaceRecognitionResult | null> => {
     if (isProcessing || isModelLoading) {
@@ -96,11 +108,17 @@ export const useFaceRecognition = () => {
             canvas.width = mediaElement.videoWidth;
             canvas.height = mediaElement.videoHeight;
             const ctx = canvas.getContext('2d');
-            ctx?.drawImage(mediaElement, 0, 0, canvas.width, canvas.height);
+            if (!ctx) {
+              throw new Error('Could not get canvas context');
+            }
+            ctx.drawImage(mediaElement, 0, 0, canvas.width, canvas.height);
             
             const imageData = canvas.toDataURL('image/png');
-            await storeUnrecognizedFace(imageData)
-              .catch(err => console.error('Failed to store unrecognized face, but continuing:', err));
+            try {
+              await storeUnrecognizedFace(imageData);
+            } catch (err) {
+              console.error('Failed to store unrecognized face, but continuing:', err);
+            }
             
             imageUrl = imageData;
           }
@@ -111,7 +129,8 @@ export const useFaceRecognition = () => {
         const result: FaceRecognitionResult = {
           recognized: false,
           status: 'unauthorized',
-          imageUrl: imageUrl
+          imageUrl: imageUrl,
+          timestamp: new Date().toISOString()
         };
         
         setResult(result);
