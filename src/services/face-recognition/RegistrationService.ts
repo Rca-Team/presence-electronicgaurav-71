@@ -27,6 +27,7 @@ export async function registerFace(
     let firebaseImageUrl = null;
     if (employeeData.image_url) {
       try {
+        console.log('Attempting to upload image to Firebase');
         // Store in face-auth folder
         const imageRef = ref(storage, `face-auth/${employeeId}`);
         // Remove data URL prefix if present
@@ -61,7 +62,7 @@ export async function registerFace(
     };
     
     // Record attendance to mark registration
-    // Fix: Use 'present' instead of 'registered' to comply with the database constraint
+    console.log('Storing registration in Supabase with status: present');
     const { error: attendanceError } = await supabase
       .from('attendance_records')
       .insert({
@@ -78,7 +79,7 @@ export async function registerFace(
       });
     
     if (attendanceError) {
-      console.error('Error recording registration:', attendanceError);
+      console.error('Error recording registration in Supabase:', attendanceError);
       return false;
     }
     
@@ -100,6 +101,7 @@ export async function storeUnrecognizedFace(imageData: string): Promise<boolean>
     // Upload unrecognized face to Firebase
     let firebaseImageUrl = null;
     try {
+      console.log('Attempting to upload unrecognized face to Firebase');
       // Store in face-auth/unrecognized folder
       const imageRef = ref(storage, `face-auth/unrecognized/${randomId}`);
       // Remove data URL prefix if present
@@ -124,6 +126,7 @@ export async function storeUnrecognizedFace(imageData: string): Promise<boolean>
       firebase_image_url: firebaseImageUrl
     };
     
+    console.log('Storing unrecognized face in Supabase with status: unauthorized');
     // Use 'unauthorized' status which should be allowed by the DB constraints
     const { error } = await supabase
       .from('attendance_records')
@@ -134,7 +137,7 @@ export async function storeUnrecognizedFace(imageData: string): Promise<boolean>
       });
       
     if (error) {
-      console.error('Error storing unrecognized face:', error);
+      console.error('Error storing unrecognized face in Supabase:', error);
       return false;
     }
     

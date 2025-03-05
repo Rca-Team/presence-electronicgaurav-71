@@ -15,7 +15,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 // Firebase configuration
 const firebaseConfig = {
-  storageBucket: "gs://face-attendance-ed516.appspot.com",
+  apiKey: "AIzaSyBRNd3qMSYy4J6GnRajnM7sQPqKMmtOSRI",
+  authDomain: "face-attendance-ed516.firebaseapp.com",
+  projectId: "face-attendance-ed516",
+  storageBucket: "face-attendance-ed516.appspot.com",
+  messagingSenderId: "823123600366",
+  appId: "1:823123600366:web:6eaac2a3fa8cf9429dca85"
 };
 
 // Initialize Firebase
