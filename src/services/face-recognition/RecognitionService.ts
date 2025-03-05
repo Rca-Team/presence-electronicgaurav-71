@@ -29,7 +29,7 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
       .map(entry => {
         const descriptor = stringToDescriptor(entry.face_data);
         // Create a labeled face descriptor for the FaceMatcher
-        return new faceapi.LabeledFaceDescriptor(
+        return new faceapi.LabeledFaceDescriptors(
           entry.user_id, 
           [descriptor] // Array of descriptors (just one in this case)
         );
