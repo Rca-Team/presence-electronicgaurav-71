@@ -3,6 +3,22 @@ import * as faceapi from 'face-api.js';
 import { supabase } from '@/integrations/supabase/client';
 import { stringToDescriptor } from './ModelService';
 
+// Define interface for the device info structure
+interface DeviceInfo {
+  metadata?: {
+    name?: string;
+    department?: string;
+    position?: string;
+    employee_id?: string;
+    firebase_image_url?: string;
+    face_descriptor?: string;
+  };
+  employee_id?: string;
+  userAgent?: string;
+  timestamp?: string;
+  registration?: boolean;
+}
+
 // New approach: Recognize face from attendance records metadata instead of face_profiles
 export async function recognizeFace(faceDescriptor: Float32Array): Promise<{ 
   recognized: boolean;
@@ -30,20 +46,26 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
     
     // Loop through registrations and compare face descriptors
     for (const registration of registrations) {
-      // Skip if device_info or metadata is missing
-      if (!registration.device_info || !registration.device_info.metadata) {
+      // Skip if device_info is missing
+      if (!registration.device_info) {
         continue;
       }
       
-      const metadata = registration.device_info.metadata;
+      // Safely cast device_info to our interface
+      const deviceInfo = registration.device_info as DeviceInfo;
+      
+      // Skip if metadata is missing
+      if (!deviceInfo.metadata) {
+        continue;
+      }
       
       // Skip if face descriptor is missing
-      if (!metadata.face_descriptor) {
+      if (!deviceInfo.metadata.face_descriptor) {
         continue;
       }
       
       // Convert stored descriptor back to Float32Array
-      const storedDescriptor = stringToDescriptor(metadata.face_descriptor);
+      const storedDescriptor = stringToDescriptor(deviceInfo.metadata.face_descriptor);
       
       // Calculate distance between current face and stored face
       const distance = faceapi.euclideanDistance(faceDescriptor, storedDescriptor);
@@ -57,12 +79,12 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
       if (confidence > 0.6) {
         matches.push({
           employee: {
-            id: registration.device_info.employee_id,
-            name: metadata.name,
-            department: metadata.department,
-            position: metadata.position,
-            employee_id: metadata.employee_id,
-            firebase_image_url: metadata.firebase_image_url
+            id: deviceInfo.employee_id,
+            name: deviceInfo.metadata.name,
+            department: deviceInfo.metadata.department,
+            position: deviceInfo.metadata.position,
+            employee_id: deviceInfo.metadata.employee_id,
+            firebase_image_url: deviceInfo.metadata.firebase_image_url
           },
           confidence
         });
