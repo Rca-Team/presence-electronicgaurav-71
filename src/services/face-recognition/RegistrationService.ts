@@ -20,7 +20,24 @@ export async function registerFace(
 ): Promise<boolean> {
   try {
     console.log('Registering face with ID:', employeeId);
-    // Use the face_profiles table to store face data
+    
+    // Store user profile info in the profiles table first
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({
+        id: employeeId,
+        username: employeeData.name,
+        updated_at: new Date().toISOString()
+      });
+      
+    if (profileError) {
+      console.error('Error storing profile information:', profileError);
+      return false;
+    }
+    
+    console.log('Profile information stored successfully');
+    
+    // Store face data in the face_profiles table
     const { error } = await supabase
       .from('face_profiles')
       .insert({
@@ -33,25 +50,43 @@ export async function registerFace(
       return false;
     }
     
-    // Store user profile info in the profiles table
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({
-        id: employeeId,
-        username: employeeData.name,
-        // Store additional data as metadata or in another field if needed
-        updated_at: new Date().toISOString()
+    console.log('Face data stored successfully');
+    
+    // Store employee metadata in a transaction record
+    const metadataRecord = {
+      employee_id: employeeData.employee_id,
+      department: employeeData.department,
+      position: employeeData.position,
+      year: employeeData.year,
+      major: employeeData.major,
+      standing: employeeData.standing,
+      starting_year: employeeData.starting_year
+    };
+    
+    // Record attendance to mark registration
+    const { error: attendanceError } = await supabase
+      .from('attendance_records')
+      .insert({
+        user_id: employeeId,
+        status: 'present',
+        device_info: {
+          userAgent: navigator.userAgent,
+          timestamp: new Date().toISOString(),
+          registration: true,
+          metadata: metadataRecord
+        },
+        confidence_score: 1.0
       });
-      
-    if (profileError) {
-      console.error('Error storing profile information:', profileError);
-      return false;
+    
+    if (attendanceError) {
+      console.error('Error recording initial attendance:', attendanceError);
+      // Don't return false here, as the face data was successfully stored
     }
     
-    console.log('Face and profile information stored successfully');
+    console.log('Face registration completed successfully');
     return true;
   } catch (error) {
-    console.error('Error registering face:', error);
+    console.error('Error in registerFace function:', error);
     return false;
   }
 }
