@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -13,7 +13,7 @@ interface WebcamProps {
   autoStart?: boolean;
 }
 
-export function Webcam({
+export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
   onCapture,
   className,
   overlayClassName,
@@ -21,12 +21,15 @@ export function Webcam({
   showControls = true,
   aspectRatio = 'video',
   autoStart = true,
-}: WebcamProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+}, ref) => {
+  const localVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isActive, setIsActive] = useState(autoStart);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Forward the video element ref
+  useImperativeHandle(ref, () => localVideoRef.current!, []);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -40,8 +43,8 @@ export function Webcam({
           video: { facingMode: cameraFacing }
         });
         
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
         }
         
         setIsLoading(false);
@@ -65,9 +68,9 @@ export function Webcam({
   }, [isActive, cameraFacing]);
 
   const handleCapture = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!localVideoRef.current || !canvasRef.current) return;
     
-    const video = videoRef.current;
+    const video = localVideoRef.current;
     const canvas = canvasRef.current;
     
     // Set canvas dimensions to match video
@@ -84,10 +87,7 @@ export function Webcam({
       
       // Call the onCapture callback with the image data
       if (onCapture) {
-        // Pass the video element directly for face-api.js
         onCapture(imageData);
-        
-        // Log for debugging
         console.log('Image captured and passed to parent component');
       }
     }
@@ -135,7 +135,7 @@ export function Webcam({
       )}
       
       <video
-        ref={videoRef}
+        ref={localVideoRef}
         autoPlay
         playsInline
         muted
@@ -218,4 +218,8 @@ export function Webcam({
       )}
     </div>
   );
-}
+});
+
+Webcam.displayName = "Webcam";
+
+export default Webcam;

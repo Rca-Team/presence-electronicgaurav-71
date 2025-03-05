@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { PageHeader } from '@/components/ui/page-header';
@@ -13,7 +14,7 @@ import { loadModels } from '@/services/face-recognition/ModelService';
 
 const Attendance = () => {
   const { toast } = useToast();
-  const webcamRef = useRef<HTMLVideoElement | null>(null);
+  const webcamRef = useRef<HTMLVideoElement>(null);
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const [stats, setStats] = useState({
     present: 0,
@@ -169,12 +170,19 @@ const Attendance = () => {
   
   const handleCapture = async () => {
     if (!webcamRef.current || isProcessing || isModelLoading) {
-      console.log('Cannot capture: webcam not ready, or processing in progress');
+      console.log('Cannot capture: webcam not ready, processing in progress, or models still loading');
+      console.log('Webcam ref exists:', !!webcamRef.current);
+      console.log('Is processing:', isProcessing);
+      console.log('Is model loading:', isModelLoading);
       return;
     }
     
     try {
       console.log('Processing face recognition...');
+      console.log('Webcam video element:', webcamRef.current);
+      console.log('Video element ready state:', webcamRef.current.readyState);
+      console.log('Video dimensions:', webcamRef.current.videoWidth, 'x', webcamRef.current.videoHeight);
+      
       const recognitionResult = await processFace(webcamRef.current);
       
       if (!recognitionResult) {

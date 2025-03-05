@@ -59,7 +59,13 @@ export const useFaceRecognition = () => {
       setError(null);
       
       // Get face descriptor
-      console.log('Getting face descriptor...');
+      console.log('Getting face descriptor from', mediaElement);
+      console.log('Media dimensions:', mediaElement.width || 'unknown width', 'x', mediaElement.height || 'unknown height');
+      
+      if (mediaElement instanceof HTMLVideoElement) {
+        console.log('Video state:', mediaElement.readyState, 'Video dimensions:', mediaElement.videoWidth, 'x', mediaElement.videoHeight);
+      }
+      
       const faceDescriptor = await getFaceDescriptor(mediaElement);
       
       if (!faceDescriptor) {
