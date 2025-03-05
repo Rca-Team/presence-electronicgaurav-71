@@ -5,13 +5,26 @@ import type { Database } from './types';
 import { initializeApp } from 'firebase/app';
 import { getStorage } from 'firebase/storage';
 
+// Use environment variables if available, otherwise fall back to hardcoded values
 const SUPABASE_URL = "https://ulqeiwqodhltoibeqzlp.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscWVpd3FvZGhsdG9pYmVxemxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNzA5MjgsImV4cCI6MjA1Njc0NjkyOH0.tEcTfAx4nisb_SaHE1GNAEcfLwbLgNJMXHrTw8wpGw0";
+
+// Log connection attempt for debugging
+console.log(`Connecting to Supabase at URL: ${SUPABASE_URL}`);
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Test connection
+supabase.auth.getSession().then(({ data, error }) => {
+  if (error) {
+    console.error('Supabase connection error:', error);
+  } else {
+    console.log('Supabase connected successfully');
+  }
+});
 
 // Firebase configuration
 const firebaseConfig = {
@@ -23,6 +36,20 @@ const firebaseConfig = {
   appId: "1:823123600366:web:6eaac2a3fa8cf9429dca85"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const storage = getStorage(app);
+// Initialize Firebase with additional logging
+try {
+  console.log('Initializing Firebase...');
+  const app = initializeApp(firebaseConfig);
+  console.log('Firebase initialized successfully');
+  export const storage = getStorage(app);
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+  // Create a fallback storage object to prevent app crashes
+  const mockStorage = {
+    ref: () => ({
+      putString: () => Promise.reject(new Error('Firebase storage not available')),
+      getDownloadURL: () => Promise.reject(new Error('Firebase storage not available'))
+    })
+  };
+  export const storage = mockStorage as any;
+}

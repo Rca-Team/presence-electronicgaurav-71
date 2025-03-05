@@ -48,8 +48,11 @@ export async function loadModels() {
     try {
       const testResponse = await fetch('/models/tiny_face_detector_model-weights_manifest.json');
       if (!testResponse.ok) {
+        console.error(`Failed to access models directory: ${testResponse.status} ${testResponse.statusText}`);
+        console.error('Response:', await testResponse.text());
         throw new Error(`Failed to access models directory: ${testResponse.status} ${testResponse.statusText}`);
       }
+      console.log('Models directory access confirmed, manifest file found');
     } catch (error) {
       console.error('Models directory access error:', error);
       throw new Error('Cannot access face recognition models directory. Please check if models are correctly deployed.');
@@ -58,8 +61,13 @@ export async function loadModels() {
     // Load models sequentially with progress tracking
     for (const model of MODEL_PATHS) {
       console.log(`Loading ${model.name} model...`);
-      await model.net.load('/models');
-      console.log(`${model.name} model loaded successfully`);
+      try {
+        await model.net.load('/models');
+        console.log(`${model.name} model loaded successfully`);
+      } catch (modelError) {
+        console.error(`Error loading ${model.name} model:`, modelError);
+        throw modelError;
+      }
     }
     
     modelsLoaded = true;
@@ -137,7 +145,12 @@ export async function getFaceDescriptor(imageElement: HTMLImageElement | HTMLVid
       });
     }
     
-    console.log('Detecting face in image...');
+    console.log('Detecting face in image...', 
+      imageElement instanceof HTMLVideoElement 
+        ? `Video dimensions: ${imageElement.videoWidth}x${imageElement.videoHeight}` 
+        : `Image dimensions: ${imageElement.width}x${imageElement.height}`
+    );
+    
     // Use TinyFaceDetector with proper options and detectionMethod
     const detectionOptions = new faceapi.TinyFaceDetectorOptions({ 
       inputSize: 416, 
