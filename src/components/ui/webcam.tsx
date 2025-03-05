@@ -27,39 +27,94 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
   const [isActive, setIsActive] = useState(autoStart);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
   // Forward the video element ref
   useImperativeHandle(ref, () => localVideoRef.current!, []);
 
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-
-    const startCamera = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: cameraFacing }
-        });
-        
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
-        
-        setIsLoading(false);
-      } catch (err) {
-        setError('Camera access denied or not available');
-        setIsLoading(false);
-        setIsActive(false);
-        console.error('Error accessing camera:', err);
+  // Function to start camera
+  const startCamera = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Stop any existing stream first
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
       }
-    };
+      
+      // Set a timeout to detect if camera access is taking too long
+      const timeoutId = setTimeout(() => {
+        setError('Camera access timeout. Please check your camera permissions.');
+        setIsLoading(false);
+      }, 10000); // 10 seconds timeout
+      
+      // Request camera access with constraints
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: cameraFacing,
+          width: { ideal: 1280 },
+          height: { ideal: 720 } 
+        }
+      });
+      
+      // Clear timeout since we got access
+      clearTimeout(timeoutId);
+      
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = mediaStream;
+        // Wait for video to be ready to play
+        await new Promise<void>((resolve) => {
+          if (localVideoRef.current) {
+            localVideoRef.current.onloadedmetadata = () => {
+              resolve();
+            };
+          } else {
+            resolve();
+          }
+        });
+      }
+      
+      setStream(mediaStream);
+      setIsLoading(false);
+      console.log('Camera started successfully');
+    } catch (err) {
+      console.error('Error accessing camera:', err);
+      
+      // Handle specific error cases
+      if (err instanceof DOMException) {
+        if (err.name === 'NotAllowedError') {
+          setError('Camera access denied. Please allow camera access in your browser settings.');
+        } else if (err.name === 'NotFoundError') {
+          setError('No camera found. Please connect a camera and try again.');
+        } else if (err.name === 'AbortError') {
+          setError('Camera access timeout. Please try again or use a different browser.');
+        } else {
+          setError(`Camera error: ${err.message}`);
+        }
+      } else {
+        setError('Camera access denied or not available. Please check your permissions.');
+      }
+      
+      setIsLoading(false);
+      setIsActive(false);
+    }
+  };
 
+  // Handle camera activation/deactivation
+  useEffect(() => {
     if (isActive) {
       startCamera();
+    } else if (stream) {
+      // Clean up stream when component is deactivated
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
     }
-
+    
+    // Clean up on unmount
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -154,7 +209,7 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
       
       {showControls && (
         <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-20">
-          {isActive ? (
+          {isActive && !error ? (
             <>
               <Button 
                 variant="outline" 
