@@ -23,22 +23,6 @@ export async function registerFace(
   try {
     console.log('Registering face with ID:', employeeId);
     
-    // Store user profile info in the profiles table first
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({
-        id: employeeId,
-        username: employeeData.name,
-        updated_at: new Date().toISOString()
-      });
-      
-    if (profileError) {
-      console.error('Error storing profile information:', profileError);
-      return false;
-    }
-    
-    console.log('Profile information stored successfully');
-    
     // Upload image to Firebase Storage if provided
     let firebaseImageUrl = null;
     if (employeeData.image_url) {
@@ -61,7 +45,7 @@ export async function registerFace(
       }
     }
     
-    // Store face data in the face_profiles table
+    // Store face data in the face_profiles table first - without foreign key constraints
     const { error } = await supabase
       .from('face_profiles')
       .insert({
@@ -85,7 +69,8 @@ export async function registerFace(
       major: employeeData.major,
       standing: employeeData.standing,
       starting_year: employeeData.starting_year,
-      firebase_image_url: firebaseImageUrl
+      firebase_image_url: firebaseImageUrl,
+      name: employeeData.name
     };
     
     // Record attendance to mark registration

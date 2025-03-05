@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import PageLayout from '@/components/layouts/PageLayout';
@@ -16,7 +15,6 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { loadModels, getFaceDescriptor, registerFace } from '@/services/FaceRecognitionService';
-import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 
 const Register = () => {
@@ -127,21 +125,9 @@ const Register = () => {
       // Generate a proper UUID for the user
       const userId = uuidv4();
       
-      // First, create or update profile in the profiles table
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: userId,
-          username: formData.name,
-          updated_at: new Date().toISOString()
-        });
-        
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
-        throw new Error('Failed to create user profile');
-      }
+      console.log('Using UUID for registration:', userId);
       
-      // Register face with our service
+      // Register face with our service - SKIP the profiles creation
       const success = await registerFace(
         userId,
         faceDescriptor,
