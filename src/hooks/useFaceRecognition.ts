@@ -19,6 +19,7 @@ export interface FaceRecognitionResult {
   status?: 'present' | 'unauthorized';  // Strictly typing this to match the database enum values
   confidence?: number;
   timestamp?: string;
+  imageUrl?: string;  // Add imageUrl field to store Firebase URL
 }
 
 export const useFaceRecognition = () => {
@@ -93,6 +94,7 @@ export const useFaceRecognition = () => {
       
       if (!recognitionResult.recognized) {
         // Store unrecognized face if it's from a video element (webcam)
+        let imageUrl;
         if (mediaElement instanceof HTMLVideoElement) {
           // Create a canvas to capture the image
           const canvas = document.createElement('canvas');
@@ -104,11 +106,14 @@ export const useFaceRecognition = () => {
           // Get image data as base64
           const imageData = canvas.toDataURL('image/png');
           await storeUnrecognizedFace(imageData);
+          
+          // The URL will be stored in Firebase by storeUnrecognizedFace
         }
         
         const result: FaceRecognitionResult = {
           recognized: false,
-          status: 'unauthorized'
+          status: 'unauthorized',
+          imageUrl: imageUrl
         };
         
         setResult(result);
@@ -133,7 +138,8 @@ export const useFaceRecognition = () => {
         employee: recognitionResult.employee,
         status: status,
         confidence: recognitionResult.confidence,
-        timestamp
+        timestamp,
+        imageUrl: recognitionResult.employee.firebase_image_url
       };
       
       setResult(result);
