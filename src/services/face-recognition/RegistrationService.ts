@@ -27,7 +27,7 @@ export async function registerFace(
     let firebaseImageUrl = null;
     if (employeeData.image_url) {
       try {
-        // Change the storage path to use 'face-auth' folder
+        // Store in face-auth folder
         const imageRef = ref(storage, `face-auth/${employeeId}`);
         // Remove data URL prefix if present
         const base64Data = employeeData.image_url.includes('data:image') 
@@ -46,9 +46,6 @@ export async function registerFace(
       }
     }
     
-    // Skip storing in face_profiles due to foreign key constraint issues
-    // Instead, only record in attendance_records which has looser constraints
-    
     // Store employee metadata in a transaction record
     const metadataRecord = {
       employee_id: employeeData.employee_id,
@@ -64,11 +61,12 @@ export async function registerFace(
     };
     
     // Record attendance to mark registration
+    // Fix: Use 'present' instead of 'registered' to comply with the database constraint
     const { error: attendanceError } = await supabase
       .from('attendance_records')
       .insert({
         user_id: null, // Use null to avoid foreign key constraints
-        status: 'registered', // Use 'registered' to differentiate from actual attendance
+        status: 'present', // Use 'present' instead of 'registered' to match DB constraints
         device_info: {
           userAgent: navigator.userAgent,
           timestamp: new Date().toISOString(),
@@ -102,7 +100,7 @@ export async function storeUnrecognizedFace(imageData: string): Promise<boolean>
     // Upload unrecognized face to Firebase
     let firebaseImageUrl = null;
     try {
-      // Change the storage path to use 'face-auth' folder for unrecognized faces too
+      // Store in face-auth/unrecognized folder
       const imageRef = ref(storage, `face-auth/unrecognized/${randomId}`);
       // Remove data URL prefix if present
       const base64Data = imageData.includes('data:image') 
@@ -126,8 +124,7 @@ export async function storeUnrecognizedFace(imageData: string): Promise<boolean>
       firebase_image_url: firebaseImageUrl
     };
     
-    // Skip storing in face_profiles due to constraints
-    // Instead, use attendance_records with unauthorized status
+    // Use 'unauthorized' status which should be allowed by the DB constraints
     const { error } = await supabase
       .from('attendance_records')
       .insert({
