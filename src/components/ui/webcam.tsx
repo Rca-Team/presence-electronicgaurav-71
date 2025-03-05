@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -29,27 +28,22 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
   const [error, setError] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
-  // Forward the video element ref
   useImperativeHandle(ref, () => localVideoRef.current!, []);
 
-  // Function to start camera
   const startCamera = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      // Stop any existing stream first
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
       
-      // Set a timeout to detect if camera access is taking too long
       const timeoutId = setTimeout(() => {
         setError('Camera access timeout. Please check your camera permissions.');
         setIsLoading(false);
-      }, 10000); // 10 seconds timeout
+      }, 10000);
       
-      // Request camera access with constraints
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: cameraFacing,
@@ -58,12 +52,10 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
         }
       });
       
-      // Clear timeout since we got access
       clearTimeout(timeoutId);
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = mediaStream;
-        // Wait for video to be ready to play
         await new Promise<void>((resolve) => {
           if (localVideoRef.current) {
             localVideoRef.current.onloadedmetadata = () => {
@@ -81,7 +73,6 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
     } catch (err) {
       console.error('Error accessing camera:', err);
       
-      // Handle specific error cases
       if (err instanceof DOMException) {
         if (err.name === 'NotAllowedError') {
           setError('Camera access denied. Please allow camera access in your browser settings.');
@@ -101,12 +92,10 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
     }
   };
 
-  // Handle camera activation/deactivation
   useEffect(() => {
     if (isActive) {
       startCamera();
     } else if (stream) {
-      // Clean up stream when component is deactivated
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
       if (localVideoRef.current) {
@@ -114,7 +103,6 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
       }
     }
     
-    // Clean up on unmount
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -128,19 +116,20 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
     const video = localVideoRef.current;
     const canvas = canvasRef.current;
     
-    // Set canvas dimensions to match video
+    if (video.readyState < 2 || video.paused || video.ended) {
+      console.log('Video not ready for capture');
+      return;
+    }
+    
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     
-    // Draw the current video frame on the canvas
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Convert canvas to base64 image
       const imageData = canvas.toDataURL('image/png');
       
-      // Call the onCapture callback with the image data
       if (onCapture) {
         onCapture(imageData);
         console.log('Image captured and passed to parent component');

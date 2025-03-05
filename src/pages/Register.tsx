@@ -37,6 +37,7 @@ const Register = () => {
   const [registrationStep, setRegistrationStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(true);
+  const [faceCaptured, setFaceCaptured] = useState(false);
 
   useEffect(() => {
     const initializeModels = async () => {
@@ -88,6 +89,7 @@ const Register = () => {
       
       setFaceImage(imageData);
       setFaceDescriptor(descriptor);
+      setFaceCaptured(true);
       
       toast({
         title: "Face Captured",
@@ -107,7 +109,7 @@ const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!faceDescriptor) {
+    if (!faceDescriptor || !faceCaptured) {
       toast({
         title: "Missing face image",
         description: "Please capture your face before submitting",
@@ -177,6 +179,7 @@ const Register = () => {
         });
         setFaceImage(null);
         setFaceDescriptor(null);
+        setFaceCaptured(false);
         setRegistrationStep(1);
       } else {
         throw new Error("Registration failed");
@@ -410,12 +413,13 @@ const Register = () => {
                   ) : (
                     <div className="flex flex-col items-center">
                       <Webcam
+                        ref={webcamRef}
                         onCapture={handleCaptureImage}
                         className="max-w-md w-full"
-                        overlayClassName={faceImage ? "border-green-500" : ""}
+                        overlayClassName={faceCaptured ? "border-green-500" : ""}
                       />
                       
-                      {faceImage && (
+                      {faceCaptured ? (
                         <div className="mt-4 text-center">
                           <div className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-500 text-sm">
                             <svg
@@ -434,6 +438,25 @@ const Register = () => {
                             You can recapture if you're not satisfied with the current image
                           </p>
                         </div>
+                      ) : (
+                        <div className="mt-4 text-center">
+                          <div className="inline-flex items-center px-3 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-500 text-sm">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className="h-4 w-4 mr-1"
+                            >
+                              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            No face captured yet
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Click the capture button when you're ready
+                          </p>
+                        </div>
                       )}
                     </div>
                   )}
@@ -449,7 +472,10 @@ const Register = () => {
                   Back
                 </Button>
                 
-                <Button type="submit" disabled={isSubmitting || !faceImage || isModelLoading}>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting || !faceCaptured || isModelLoading}
+                >
                   {isSubmitting ? (
                     <>
                       <span className="h-4 w-4 mr-2 rounded-full border-2 border-current border-r-transparent animate-spin"></span>
