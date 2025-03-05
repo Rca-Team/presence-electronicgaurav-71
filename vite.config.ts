@@ -29,5 +29,7 @@ export default defineConfig(({ mode }) => ({
         }
       }
     }
-  }
+  },
+  // Add this to ensure environment variables are correctly loaded
+  envPrefix: 'VITE_'
 }));
