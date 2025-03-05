@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { loadModels, getFaceDescriptor, registerFace } from '@/services/FaceRecognitionService';
 import { supabase } from '@/integrations/supabase/client';
+import { v4 as uuidv4 } from 'uuid';
 
 const Register = () => {
   const { toast } = useToast();
@@ -123,9 +124,8 @@ const Register = () => {
     try {
       console.log('Submitting registration data');
       
-      // Create a user ID - in a real app, this might be a UUID or user authentication ID
-      // For this example, we'll use the employeeId as the user ID
-      const userId = formData.employeeId;
+      // Generate a proper UUID for the user
+      const userId = uuidv4();
       
       // First, create or update profile in the profiles table
       const { error: profileError } = await supabase

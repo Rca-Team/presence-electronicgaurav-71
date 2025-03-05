@@ -19,6 +19,7 @@ export async function registerFace(
   }
 ): Promise<boolean> {
   try {
+    console.log('Registering face with ID:', employeeId);
     // Use the face_profiles table to store face data
     const { error } = await supabase
       .from('face_profiles')
