@@ -37,11 +37,12 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase with additional logging
+let storage;
 try {
   console.log('Initializing Firebase...');
   const app = initializeApp(firebaseConfig);
   console.log('Firebase initialized successfully');
-  export const storage = getStorage(app);
+  storage = getStorage(app);
 } catch (error) {
   console.error('Firebase initialization error:', error);
   // Create a fallback storage object to prevent app crashes
@@ -51,5 +52,8 @@ try {
       getDownloadURL: () => Promise.reject(new Error('Firebase storage not available'))
     })
   };
-  export const storage = mockStorage as any;
+  storage = mockStorage as any;
 }
+
+// Make storage available for import
+export { storage };
