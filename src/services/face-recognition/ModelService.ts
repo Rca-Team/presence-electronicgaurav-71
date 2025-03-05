@@ -113,8 +113,8 @@ export async function getFaceDescriptor(imageElement: HTMLImageElement | HTMLVid
       await loadModels();
     }
     
-    // Wait for the image/video to be fully loaded
-    if (imageElement.complete === false || 
+    // Wait for the image/video to be fully loaded - with proper type checking
+    if ((imageElement instanceof HTMLImageElement && imageElement.complete === false) || 
         (imageElement instanceof HTMLVideoElement && 
          (imageElement.readyState < 2 || imageElement.videoWidth === 0))) {
       
@@ -127,7 +127,7 @@ export async function getFaceDescriptor(imageElement: HTMLImageElement | HTMLVid
             } else {
               setTimeout(checkReady, 100);
             }
-          } else if (imageElement.complete) {
+          } else if (imageElement instanceof HTMLImageElement && imageElement.complete) {
             resolve();
           } else {
             setTimeout(checkReady, 100);
