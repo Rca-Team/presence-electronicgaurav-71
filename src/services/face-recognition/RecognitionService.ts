@@ -19,7 +19,7 @@ interface DeviceInfo {
   registration?: boolean;
 }
 
-// New approach: Recognize face from attendance records metadata instead of face_profiles
+// Fixed approach: Recognize face from attendance records with registration=true
 export async function recognizeFace(faceDescriptor: Float32Array): Promise<{ 
   recognized: boolean;
   employee?: any;
@@ -28,29 +28,42 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
   try {
     console.log('Attempting to recognize face...');
     
-    // Get all attendance records with registration=true
+    // Get all attendance records with registration=true in the device_info
     const { data: registrations, error } = await supabase
       .from('attendance_records')
       .select('*')
-      .eq('status', 'registered');
+      .eq('status', 'present');
     
-    if (error || !registrations || registrations.length === 0) {
-      console.log('No registered faces found:', error);
+    if (error) {
+      console.error('Error fetching registered faces:', error);
       return { recognized: false };
     }
     
-    console.log(`Found ${registrations.length} registered faces to compare against`);
+    if (!registrations || registrations.length === 0) {
+      console.log('No registered faces found');
+      return { recognized: false };
+    }
+    
+    // Filter to only include registration records
+    const registrationRecords = registrations.filter(record => 
+      record.device_info && 
+      record.device_info.registration === true &&
+      record.device_info.metadata && 
+      record.device_info.metadata.face_descriptor
+    );
+    
+    if (registrationRecords.length === 0) {
+      console.log('No face registration records found in the database');
+      return { recognized: false };
+    }
+    
+    console.log(`Found ${registrationRecords.length} registered faces to compare against`);
     
     // Array to store matches with confidence scores
     const matches: Array<{ employee: any; confidence: number }> = [];
     
     // Loop through registrations and compare face descriptors
-    for (const registration of registrations) {
-      // Skip if device_info is missing
-      if (!registration.device_info) {
-        continue;
-      }
-      
+    for (const registration of registrationRecords) {
       // Safely cast device_info to our interface
       const deviceInfo = registration.device_info as DeviceInfo;
       
@@ -64,30 +77,35 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
         continue;
       }
       
-      // Convert stored descriptor back to Float32Array
-      const storedDescriptor = stringToDescriptor(deviceInfo.metadata.face_descriptor);
-      
-      // Calculate distance between current face and stored face
-      const distance = faceapi.euclideanDistance(faceDescriptor, storedDescriptor);
-      
-      // Convert distance to confidence (1.0 - distance), lower distance = higher confidence
-      const confidence = Math.max(0, 1 - distance);
-      
-      console.log(`Face comparison result - Distance: ${distance}, Confidence: ${confidence}`);
-      
-      // If confidence is above threshold, consider it a match
-      if (confidence > 0.6) {
-        matches.push({
-          employee: {
-            id: deviceInfo.employee_id,
-            name: deviceInfo.metadata.name,
-            department: deviceInfo.metadata.department,
-            position: deviceInfo.metadata.position,
-            employee_id: deviceInfo.metadata.employee_id,
-            firebase_image_url: deviceInfo.metadata.firebase_image_url
-          },
-          confidence
-        });
+      try {
+        // Convert stored descriptor back to Float32Array
+        const storedDescriptor = stringToDescriptor(deviceInfo.metadata.face_descriptor);
+        
+        // Calculate distance between current face and stored face
+        const distance = faceapi.euclideanDistance(faceDescriptor, storedDescriptor);
+        
+        // Convert distance to confidence (1.0 - distance), lower distance = higher confidence
+        const confidence = Math.max(0, 1 - distance);
+        
+        console.log(`Face comparison result - Name: ${deviceInfo.metadata.name}, Distance: ${distance}, Confidence: ${confidence}`);
+        
+        // If confidence is above threshold, consider it a match
+        if (confidence > 0.6) {
+          matches.push({
+            employee: {
+              id: deviceInfo.employee_id,
+              name: deviceInfo.metadata.name,
+              department: deviceInfo.metadata.department,
+              position: deviceInfo.metadata.position,
+              employee_id: deviceInfo.metadata.employee_id,
+              firebase_image_url: deviceInfo.metadata.firebase_image_url
+            },
+            confidence
+          });
+        }
+      } catch (descriptorError) {
+        console.error('Error processing face descriptor:', descriptorError);
+        continue; // Skip this record and try the next one
       }
     }
     
@@ -97,7 +115,7 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<{
       matches.sort((a, b) => b.confidence - a.confidence);
       
       const bestMatch = matches[0];
-      console.log('Face recognized successfully:', bestMatch.employee.name);
+      console.log('Face recognized successfully:', bestMatch.employee.name, 'with confidence:', bestMatch.confidence);
       
       return {
         recognized: true,

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import * as faceapi from 'face-api.js';
 import { 
@@ -86,6 +87,7 @@ export const useFaceRecognition = () => {
       const recognitionResult = await recognizeFace(faceDescriptor);
       
       if (!recognitionResult.recognized) {
+        console.log('Face not recognized, storing as unrecognized');
         let imageUrl;
         if (mediaElement instanceof HTMLVideoElement) {
           const canvas = document.createElement('canvas');
@@ -95,7 +97,8 @@ export const useFaceRecognition = () => {
           ctx?.drawImage(mediaElement, 0, 0, canvas.width, canvas.height);
           
           const imageData = canvas.toDataURL('image/png');
-          await storeUnrecognizedFace(imageData);
+          await storeUnrecognizedFace(imageData)
+            .catch(err => console.error('Failed to store unrecognized face, but continuing:', err));
           
           imageUrl = imageData;
         }
@@ -113,6 +116,7 @@ export const useFaceRecognition = () => {
       
       const status: 'present' | 'unauthorized' = 'present';
       
+      // Successfully recognized the face, record attendance
       await recordAttendance(
         recognitionResult.employee.id, 
         status, 
