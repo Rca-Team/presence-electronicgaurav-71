@@ -21,26 +21,15 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    outDir: 'dist',
     sourcemap: true,
-    // Optimize build for better face-api.js support
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          faceapi: ['face-api.js'],
-          firebase: ['firebase/app', 'firebase/storage'],
-          supabase: ['@supabase/supabase-js']
+          'face-api': ['face-api.js']
         }
       }
     }
   },
-  // Configure server headers for better loading of model files
-  optimizeDeps: {
-    exclude: ['face-api.js'], // Prevent face-api.js from being pre-bundled
-  },
-  // Better handle of large model files
-  css: {
-    devSourcemap: true,
-  },
+  // Add this to ensure environment variables are correctly loaded
+  envPrefix: 'VITE_'
 }));

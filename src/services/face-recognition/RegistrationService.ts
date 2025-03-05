@@ -1,5 +1,7 @@
-import { supabase, storage } from '@/integrations/supabase/client';
+
+import { supabase } from '@/integrations/supabase/client';
 import { descriptorToString } from './ModelService';
+import { storage } from '@/integrations/supabase/client';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 // Register a new face

@@ -1,10 +1,9 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import * as faceapi from 'face-api.js';
 import { 
   loadModels, 
-  getFaceDescriptor,
-  areModelsLoaded
+  getFaceDescriptor 
 } from '@/services/face-recognition/ModelService';
 import {
   recognizeFace,
@@ -13,7 +12,6 @@ import {
 import {
   storeUnrecognizedFace
 } from '@/services/face-recognition/RegistrationService';
-import { toast } from 'sonner';
 
 export interface FaceRecognitionResult {
   recognized: boolean;
@@ -34,38 +32,24 @@ export const useFaceRecognition = () => {
     const initializeModels = async () => {
       try {
         setIsModelLoading(true);
-        setError(null);
-        console.log('Starting face recognition model initialization...');
+        console.log('Starting to load face recognition models...');
         await loadModels();
         setIsModelLoading(false);
         console.log('Models loaded successfully');
       } catch (err) {
         console.error('Error loading face recognition models:', err);
-        setError('Failed to load face recognition models. Please refresh the page.');
+        setError('Failed to load face recognition models');
         setIsModelLoading(false);
-        toast.error('Failed to load face recognition models. Please refresh the page.');
       }
     };
     
     console.log('Starting model initialization');
-    if (!areModelsLoaded()) {
-      initializeModels();
-    } else {
-      setIsModelLoading(false);
-      console.log('Models already loaded');
-    }
+    initializeModels();
   }, []);
   
-  const processFace = useCallback(async (mediaElement: HTMLVideoElement | HTMLImageElement): Promise<FaceRecognitionResult | null> => {
-    if (isProcessing) {
-      console.log('Already processing a face');
-      return null;
-    }
-    
-    if (isModelLoading) {
-      console.log('Models still loading, cannot process face yet');
-      setError('Face recognition models are still loading. Please wait...');
-      toast.error('Face recognition models are still loading. Please wait...');
+  const processFace = async (mediaElement: HTMLVideoElement | HTMLImageElement): Promise<FaceRecognitionResult | null> => {
+    if (isProcessing || isModelLoading) {
+      console.log('Already processing or models still loading');
       return null;
     }
     
@@ -74,11 +58,7 @@ export const useFaceRecognition = () => {
       setIsProcessing(true);
       setError(null);
       
-      console.log('Media dimensions:', 
-        mediaElement instanceof HTMLVideoElement 
-          ? `${mediaElement.videoWidth || 'unknown width'} x ${mediaElement.videoHeight || 'unknown height'}`
-          : `${mediaElement.width || 'unknown width'} x ${mediaElement.height || 'unknown height'}`
-      );
+      console.log('Media dimensions:', mediaElement.width || 'unknown width', 'x', mediaElement.height || 'unknown height');
       
       if (mediaElement instanceof HTMLVideoElement) {
         console.log('Video state:', mediaElement.readyState, 'Video dimensions:', mediaElement.videoWidth, 'x', mediaElement.videoHeight);
@@ -90,7 +70,6 @@ export const useFaceRecognition = () => {
           if (mediaElement.readyState < 2 || mediaElement.videoWidth === 0) {
             setError('Video stream not ready. Please try again.');
             setIsProcessing(false);
-            toast.error('Video stream not ready. Please try again.');
             return null;
           }
         }
@@ -102,7 +81,6 @@ export const useFaceRecognition = () => {
         console.log('No face detected');
         setError('No face detected in the image');
         setIsProcessing(false);
-        toast.error('No face detected. Please try again.');
         return null;
       }
       
@@ -112,18 +90,22 @@ export const useFaceRecognition = () => {
       if (!recognitionResult.recognized) {
         console.log('Face not recognized, storing as unrecognized');
         let imageUrl;
-        if (mediaElement instanceof HTMLVideoElement) {
-          const canvas = document.createElement('canvas');
-          canvas.width = mediaElement.videoWidth;
-          canvas.height = mediaElement.videoHeight;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(mediaElement, 0, 0, canvas.width, canvas.height);
-          
-          const imageData = canvas.toDataURL('image/png');
-          await storeUnrecognizedFace(imageData)
-            .catch(err => console.error('Failed to store unrecognized face, but continuing:', err));
-          
-          imageUrl = imageData;
+        try {
+          if (mediaElement instanceof HTMLVideoElement) {
+            const canvas = document.createElement('canvas');
+            canvas.width = mediaElement.videoWidth;
+            canvas.height = mediaElement.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(mediaElement, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = canvas.toDataURL('image/png');
+            await storeUnrecognizedFace(imageData)
+              .catch(err => console.error('Failed to store unrecognized face, but continuing:', err));
+            
+            imageUrl = imageData;
+          }
+        } catch (storageError) {
+          console.error('Error storing unrecognized face, continuing with recognition flow:', storageError);
         }
         
         const result: FaceRecognitionResult = {
@@ -132,7 +114,6 @@ export const useFaceRecognition = () => {
           imageUrl: imageUrl
         };
         
-        toast.error('Face not recognized.');
         setResult(result);
         setIsProcessing(false);
         return result;
@@ -140,12 +121,16 @@ export const useFaceRecognition = () => {
       
       const status: 'present' | 'unauthorized' = 'present';
       
-      // Successfully recognized the face, record attendance
-      await recordAttendance(
-        recognitionResult.employee.id, 
-        status, 
-        recognitionResult.confidence
-      );
+      try {
+        // Successfully recognized the face, record attendance
+        await recordAttendance(
+          recognitionResult.employee.id, 
+          status, 
+          recognitionResult.confidence
+        );
+      } catch (attendanceError) {
+        console.error('Error recording attendance, but continuing with recognition result:', attendanceError);
+      }
       
       const timestamp = new Date().toISOString();
       
@@ -158,25 +143,22 @@ export const useFaceRecognition = () => {
         imageUrl: recognitionResult.employee.firebase_image_url
       };
       
-      toast.success(`Welcome, ${recognitionResult.employee.name}!`);
       setResult(result);
       setIsProcessing(false);
       console.log('Face processing complete', result);
       return result;
     } catch (err) {
       console.error('Error processing face:', err);
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      setError('Error processing face: ' + errorMessage);
+      setError('Error processing face: ' + (err instanceof Error ? err.message : String(err)));
       setIsProcessing(false);
-      toast.error('Error processing face: ' + errorMessage);
       return null;
     }
-  }, [isProcessing, isModelLoading]);
+  };
   
-  const resetResult = useCallback(() => {
+  const resetResult = () => {
     setResult(null);
     setError(null);
-  }, []);
+  };
   
   return {
     processFace,
