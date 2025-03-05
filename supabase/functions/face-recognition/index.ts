@@ -22,6 +22,21 @@ serve(async (req) => {
     
     const { operation } = await req.json()
     
+    // Health check endpoint for model status
+    if (operation === 'healthCheck') {
+      return new Response(
+        JSON.stringify({
+          status: 'ok',
+          message: 'Face recognition service is running',
+          timestamp: new Date().toISOString()
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
+    }
+    
     // Sample function to get attendance statistics
     if (operation === 'getAttendanceStats') {
       const today = new Date().toISOString().split('T')[0]
@@ -87,8 +102,14 @@ serve(async (req) => {
       }
     )
   } catch (error) {
+    console.error('Face recognition function error:', error);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        timestamp: new Date().toISOString(),
+        details: error.stack
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
