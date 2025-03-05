@@ -27,37 +27,24 @@ export const useFaceRecognition = () => {
   const [isModelLoading, setIsModelLoading] = useState<boolean>(true);
   const [result, setResult] = useState<FaceRecognitionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [modelsLoaded, setModelsLoaded] = useState<boolean>(false);
   
   useEffect(() => {
     const initializeModels = async () => {
-      if (modelsLoaded) return;
-      
       try {
         setIsModelLoading(true);
-        console.log('Starting to load face recognition models...');
         await loadModels();
         setIsModelLoading(false);
-        setModelsLoaded(true);
         console.log('Models loaded successfully');
       } catch (err) {
         console.error('Error loading face recognition models:', err);
-        setError('Failed to load face recognition models: ' + (err instanceof Error ? err.message : String(err)));
+        setError('Failed to load face recognition models');
         setIsModelLoading(false);
-        
-        // Retry loading after 3 seconds in case of network issues
-        setTimeout(() => {
-          if (!modelsLoaded) {
-            console.log('Retrying model loading...');
-            setModelsLoaded(false);
-          }
-        }, 3000);
       }
     };
     
     console.log('Starting model initialization');
     initializeModels();
-  }, [modelsLoaded]);
+  }, []);
   
   const processFace = async (mediaElement: HTMLVideoElement | HTMLImageElement): Promise<FaceRecognitionResult | null> => {
     if (isProcessing || isModelLoading) {
@@ -102,35 +89,24 @@ export const useFaceRecognition = () => {
       if (!recognitionResult.recognized) {
         console.log('Face not recognized, storing as unrecognized');
         let imageUrl;
-        try {
-          if (mediaElement instanceof HTMLVideoElement) {
-            const canvas = document.createElement('canvas');
-            canvas.width = mediaElement.videoWidth;
-            canvas.height = mediaElement.videoHeight;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              throw new Error('Could not get canvas context');
-            }
-            ctx.drawImage(mediaElement, 0, 0, canvas.width, canvas.height);
-            
-            const imageData = canvas.toDataURL('image/png');
-            try {
-              await storeUnrecognizedFace(imageData);
-            } catch (err) {
-              console.error('Failed to store unrecognized face, but continuing:', err);
-            }
-            
-            imageUrl = imageData;
-          }
-        } catch (storageError) {
-          console.error('Error storing unrecognized face, continuing with recognition flow:', storageError);
+        if (mediaElement instanceof HTMLVideoElement) {
+          const canvas = document.createElement('canvas');
+          canvas.width = mediaElement.videoWidth;
+          canvas.height = mediaElement.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(mediaElement, 0, 0, canvas.width, canvas.height);
+          
+          const imageData = canvas.toDataURL('image/png');
+          await storeUnrecognizedFace(imageData)
+            .catch(err => console.error('Failed to store unrecognized face, but continuing:', err));
+          
+          imageUrl = imageData;
         }
         
         const result: FaceRecognitionResult = {
           recognized: false,
           status: 'unauthorized',
-          imageUrl: imageUrl,
-          timestamp: new Date().toISOString()
+          imageUrl: imageUrl
         };
         
         setResult(result);
@@ -140,16 +116,12 @@ export const useFaceRecognition = () => {
       
       const status: 'present' | 'unauthorized' = 'present';
       
-      try {
-        // Successfully recognized the face, record attendance
-        await recordAttendance(
-          recognitionResult.employee.id, 
-          status, 
-          recognitionResult.confidence
-        );
-      } catch (attendanceError) {
-        console.error('Error recording attendance, but continuing with recognition result:', attendanceError);
-      }
+      // Successfully recognized the face, record attendance
+      await recordAttendance(
+        recognitionResult.employee.id, 
+        status, 
+        recognitionResult.confidence
+      );
       
       const timestamp = new Date().toISOString();
       
