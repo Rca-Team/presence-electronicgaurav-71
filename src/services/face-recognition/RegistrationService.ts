@@ -27,7 +27,8 @@ export async function registerFace(
     let firebaseImageUrl = null;
     if (employeeData.image_url) {
       try {
-        const imageRef = ref(storage, `student-photos/${employeeId}`);
+        // Change the storage path to use 'face-auth' folder
+        const imageRef = ref(storage, `face-auth/${employeeId}`);
         // Remove data URL prefix if present
         const base64Data = employeeData.image_url.includes('data:image') 
           ? employeeData.image_url.split(',')[1] 
@@ -101,7 +102,8 @@ export async function storeUnrecognizedFace(imageData: string): Promise<boolean>
     // Upload unrecognized face to Firebase
     let firebaseImageUrl = null;
     try {
-      const imageRef = ref(storage, `unrecognized-faces/${randomId}`);
+      // Change the storage path to use 'face-auth' folder for unrecognized faces too
+      const imageRef = ref(storage, `face-auth/unrecognized/${randomId}`);
       // Remove data URL prefix if present
       const base64Data = imageData.includes('data:image') 
         ? imageData.split(',')[1] 
