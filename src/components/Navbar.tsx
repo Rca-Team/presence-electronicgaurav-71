@@ -4,10 +4,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import Logo from './Logo';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
+  const isMobile = useIsMobile();
   
   useEffect(() => {
     const handleScroll = () => {
@@ -33,6 +35,7 @@ const Navbar = () => {
           <Logo />
         </Link>
         
+        {/* Desktop Navigation - Hidden on Mobile */}
         <nav className="hidden md:flex items-center space-x-1 animate-fade-in">
           {[
             { text: 'Home', path: '/' },
@@ -55,7 +58,8 @@ const Navbar = () => {
           ))}
         </nav>
         
-        <div className="flex items-center space-x-4 animate-fade-in">
+        {/* Sign In / Get Started buttons - Only show on desktop */}
+        <div className="hidden md:flex items-center space-x-4 animate-fade-in">
           <Link to="/login">
             <Button variant="ghost" size="sm">
               Sign In
