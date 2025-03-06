@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import PageLayout from '@/components/layouts/PageLayout';
 import { Webcam } from '@/components/ui/webcam';
+import { AboutMe } from '@/components/AboutMe';
 import { cn } from '@/lib/utils';
 
 const Index = () => {
@@ -52,6 +53,11 @@ const Index = () => {
             </Card>
           </div>
         </div>
+      </section>
+      
+      {/* About Me Section */}
+      <section className="py-8 md:py-16">
+        <AboutMe />
       </section>
       
       {/* Features Section */}
