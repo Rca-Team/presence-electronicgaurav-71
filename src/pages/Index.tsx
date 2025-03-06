@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -114,6 +113,77 @@ const Index = () => {
               <p className="text-muted-foreground">{feature.description}</p>
             </Card>
           ))}
+        </div>
+      </section>
+      
+      {/* Advanced Features Section */}
+      <section className="py-16 md:py-24 bg-muted/30">
+        <div className="container mx-auto">
+          <div className="text-center mb-16 animate-slide-in-up">
+            <h2 className="text-3xl font-bold mb-4">Advanced Features</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto text-balance">
+              Explore the powerful capabilities that make Presence the leading solution for attendance management.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {[
+              {
+                title: "Face Data Storage in Firebase",
+                description: "Securely store facial recognition data and attendance records in Firebase's robust cloud infrastructure.",
+                icon: (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+                    <path d="M4 15s1-1 4-1 5 1 8 1 4-1 4-1M4 19s1-1 4-1 5 1 8 1 4-1 4-1M4 11s1-1 4-1 5 1 8 1 4-1 4-1" fill="currentColor"/>
+                  </svg>
+                ),
+                delay: "0ms"
+              },
+              {
+                title: "Daily & Monthly Attendance Reports",
+                description: "Generate comprehensive attendance reports and export them as Excel or PDF files for easy record-keeping and analysis.",
+                icon: (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+                    <path d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m6 0h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-4m-6-4V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v12m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2" fill="currentColor"/>
+                  </svg>
+                ),
+                delay: "100ms"
+              },
+              {
+                title: "Geofencing",
+                description: "Enhance security by restricting attendance to specific geographic locations, ensuring authenticity of check-ins.",
+                icon: (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="currentColor"/>
+                    <circle cx="12" cy="10" r="3" fill="white"/>
+                  </svg>
+                ),
+                delay: "200ms"
+              },
+              {
+                title: "Mobile-Friendly Design",
+                description: "Access the full functionality of Presence from any device with our responsive interface optimized for both desktop and mobile.",
+                icon: (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
+                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" fill="currentColor"/>
+                    <line x1="12" y1="18" x2="12" y2="18.01" stroke="white" strokeWidth="2"/>
+                  </svg>
+                ),
+                delay: "300ms"
+              }
+            ].map((feature, index) => (
+              <Card 
+                key={index} 
+                className="p-6 hover-lift backdrop-panel animate-slide-in-up"
+                style={{ animationDelay: feature.delay }}
+              >
+                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-4">
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                <p className="text-muted-foreground">{feature.description}</p>
+              </Card>
+            ))}
+          </div>
         </div>
       </section>
       
