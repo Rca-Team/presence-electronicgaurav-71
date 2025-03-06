@@ -94,8 +94,13 @@ const Attendance = () => {
       }
     };
     
+    // Fetch immediately
     fetchRecentAttendance();
     
+    // Set up real-time updates with 1-second interval for frequent updates
+    const intervalId = setInterval(fetchRecentAttendance, 1000);
+    
+    // Set up Supabase real-time subscription for immediate updates
     const subscription = supabase
       .channel('attendance_changes')
       .on('postgres_changes', { 
@@ -108,6 +113,7 @@ const Attendance = () => {
       .subscribe();
       
     return () => {
+      clearInterval(intervalId);
       subscription.unsubscribe();
     };
   }, []);
