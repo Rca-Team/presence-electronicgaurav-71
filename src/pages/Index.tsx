@@ -6,6 +6,7 @@ import PageLayout from '@/components/layouts/PageLayout';
 import { Webcam } from '@/components/ui/webcam';
 import { AboutMe } from '@/components/AboutMe';
 import { cn } from '@/lib/utils';
+import { Database, FileSpreadsheet, Globe, Smartphone } from 'lucide-react';
 
 const Index = () => {
   return (
@@ -131,43 +132,25 @@ const Index = () => {
               {
                 title: "Face Data Storage in Firebase",
                 description: "Securely store facial recognition data and attendance records in Firebase's robust cloud infrastructure.",
-                icon: (
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-                    <path d="M4 15s1-1 4-1 5 1 8 1 4-1 4-1M4 19s1-1 4-1 5 1 8 1 4-1 4-1M4 11s1-1 4-1 5 1 8 1 4-1 4-1" fill="currentColor"/>
-                  </svg>
-                ),
+                icon: <Database className="h-6 w-6" />,
                 delay: "0ms"
               },
               {
                 title: "Daily & Monthly Attendance Reports",
                 description: "Generate comprehensive attendance reports and export them as Excel or PDF files for easy record-keeping and analysis.",
-                icon: (
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-                    <path d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m6 0h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-4m-6-4V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v12m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2" fill="currentColor"/>
-                  </svg>
-                ),
+                icon: <FileSpreadsheet className="h-6 w-6" />,
                 delay: "100ms"
               },
               {
                 title: "Geofencing",
                 description: "Enhance security by restricting attendance to specific geographic locations, ensuring authenticity of check-ins.",
-                icon: (
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="currentColor"/>
-                    <circle cx="12" cy="10" r="3" fill="white"/>
-                  </svg>
-                ),
+                icon: <Globe className="h-6 w-6" />,
                 delay: "200ms"
               },
               {
                 title: "Mobile-Friendly Design",
                 description: "Access the full functionality of Presence from any device with our responsive interface optimized for both desktop and mobile.",
-                icon: (
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" fill="currentColor"/>
-                    <line x1="12" y1="18" x2="12" y2="18.01" stroke="white" strokeWidth="2"/>
-                  </svg>
-                ),
+                icon: <Smartphone className="h-6 w-6" />,
                 delay: "300ms"
               }
             ].map((feature, index) => (
