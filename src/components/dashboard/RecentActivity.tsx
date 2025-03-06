@@ -1,14 +1,53 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { supabase } from '@/integrations/supabase/client';
 
 interface RecentActivityProps {
   isLoading: boolean;
   activityData?: any[];
 }
 
-const RecentActivity: React.FC<RecentActivityProps> = ({ isLoading, activityData }) => {
+const RecentActivity: React.FC<RecentActivityProps> = ({ isLoading, activityData: initialActivityData }) => {
+  const [activityData, setActivityData] = useState(initialActivityData || []);
+
+  useEffect(() => {
+    // Set initial data from props
+    if (initialActivityData) {
+      setActivityData(initialActivityData);
+    }
+
+    // Setup real-time data fetch with 1-second interval
+    const fetchRecentActivity = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('attendance_records')
+          .select('*, user_id')
+          .order('timestamp', { ascending: false })
+          .limit(5);
+          
+        if (error) {
+          console.error('Error fetching recent activity:', error);
+          return;
+        }
+        
+        if (data) {
+          setActivityData(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch recent activity:', err);
+      }
+    };
+
+    // Fetch immediately and then set up interval
+    fetchRecentActivity();
+    const intervalId = setInterval(fetchRecentActivity, 1000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [initialActivityData]);
+
   return (
     <Card className="p-6 md:col-span-2 animate-slide-in-up" style={{ animationDelay: '300ms' }}>
       <h3 className="text-lg font-medium mb-4">Recent Activity</h3>

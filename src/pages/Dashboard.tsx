@@ -36,7 +36,7 @@ const Dashboard = () => {
   } = useQuery({
     queryKey: ['registeredFaces'],
     queryFn: fetchRegisteredFaces,
-    refetchInterval: 5000, // Refetch every 5 seconds
+    refetchInterval: 1000, // Updated to 1 second for real-time updates
   });
   
   // Check for error state
