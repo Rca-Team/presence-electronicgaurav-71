@@ -271,7 +271,7 @@ const Register = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="employeeId">Employee ID</Label>
+                    <Label htmlFor="employeeId">Student ID</Label>
                     <Input
                       id="employeeId"
                       name="employeeId"
@@ -289,11 +289,11 @@ const Register = () => {
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="engineering">Engineering</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="hr">Human Resources</SelectItem>
-                        <SelectItem value="operations">Operations</SelectItem>
+                        <SelectItem value="A">A</SelectItem>
+                        <SelectItem value="B">B</SelectItem>
+                        <SelectItem value="C">C</SelectItem>
+                        <SelectItem value="D">D</SelectItem>
+                        <SelectItem value="Teacher">Teacher</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -312,7 +312,7 @@ const Register = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="major">Major/Specialization</Label>
+                    <Label htmlFor="major">Major/Class</Label>
                     <Input
                       id="major"
                       name="major"

@@ -27,7 +27,7 @@ export const processWeeklyData = (records: any[]) => {
 
 // Process department data
 export const processDepartmentData = (records: any[]) => {
-  const departments = ['Engineering', 'Marketing', 'Finance', 'HR', 'Operations'];
+  const departments = ['A', 'B', 'C', 'D', 'Teacher'];
   return departments.map(dept => {
     // Count employees with metadata containing this department
     const deptRecords = records.filter(record => {
