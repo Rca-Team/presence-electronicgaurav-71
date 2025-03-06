@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -146,7 +145,7 @@ const Dashboard = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboardStats'],
     queryFn: fetchAttendanceStats,
-    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+    refetchInterval: 1000, // Updated: Refetch every 1 second for real-time updates
   });
   
   // Check for error state
