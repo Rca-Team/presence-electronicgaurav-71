@@ -49,14 +49,15 @@ npm run dev
 
 Make sure to set the following environment variables in your Vercel project settings:
 
-- `VITE_SUPABASE_URL`: Your Supabase project URL
-- `VITE_SUPABASE_ANON_KEY`: Your Supabase anonymous key
-- `VITE_FIREBASE_API_KEY`: Firebase API key
-- `VITE_FIREBASE_AUTH_DOMAIN`: Firebase auth domain
-- `VITE_FIREBASE_PROJECT_ID`: Firebase project ID
-- `VITE_FIREBASE_STORAGE_BUCKET`: Firebase storage bucket
-- `VITE_FIREBASE_MESSAGING_SENDER_ID`: Firebase messaging sender ID
-- `VITE_FIREBASE_APP_ID`: Firebase app ID
+VITE_SUPABASE_URL=https://ulqeiwqodhltoibeqzlp.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVscWVpd3FvZGhsdG9pYmVxemxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNzA5MjgsImV4cCI6MjA1Njc0NjkyOH0.tEcTfAx4nisb_SaHE1GNAEcfLwbLgNJMXHrTw8wpGw0
+
+VITE_FIREBASE_API_KEY=AIzaSyBRNd3qMSYy4J6GnRajnM7sQPqKMmtOSRI
+VITE_FIREBASE_AUTH_DOMAIN=face-attendance-ed516.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=face-attendance-ed516
+VITE_FIREBASE_STORAGE_BUCKET=face-attendance-ed516.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=823123600366
+VITE_FIREBASE_APP_ID=1:823123600366:web:6eaac2a3fa8cf9429dca85
 
 ### Deploy to Vercel
 
