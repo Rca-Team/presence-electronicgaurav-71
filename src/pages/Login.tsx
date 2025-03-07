@@ -1,14 +1,73 @@
 
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import Logo from '@/components/Logo';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useAuth } from '@/hooks/useAuth';
+import { ADMIN_EMAIL } from '@/services/auth/authService';
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { login, isAdmin } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    remember: false
+  });
+
+  // If already logged in as admin, redirect to admin page
+  React.useEffect(() => {
+    if (isAdmin) {
+      navigate('/admin');
+    }
+  }, [isAdmin, navigate]);
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
+  
+  const handleCheckboxChange = (checked: boolean) => {
+    setFormData(prev => ({ ...prev, remember: checked }));
+  };
+  
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    try {
+      const { success, error } = await login(formData.email, formData.password);
+      
+      if (success) {
+        toast({
+          title: "Login successful",
+          description: "Welcome to Admin Dashboard",
+        });
+      } else {
+        toast({
+          title: "Login failed",
+          description: error || "Invalid credentials",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Login error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Image Section */}
@@ -26,9 +85,9 @@ const Login = () => {
         <div className="relative h-full flex items-center p-12">
           <div className="max-w-xl">
             <Logo size="lg" className="text-white mb-6" />
-            <h1 className="text-4xl font-bold text-white mb-4">Login Page</h1>
+            <h1 className="text-4xl font-bold text-white mb-4">Admin Access Only</h1>
             <p className="text-lg text-white/80">
-              This is a demo login page. Authentication has been removed.
+              Access the admin dashboard with secure authentication.
             </p>
           </div>
         </div>
@@ -41,20 +100,28 @@ const Login = () => {
             <div className="lg:hidden">
               <Logo className="mx-auto lg:mx-0 mb-6" />
             </div>
-            <h2 className="text-2xl font-bold">Login</h2>
+            <h2 className="text-2xl font-bold">Admin Login</h2>
             <p className="mt-2 text-muted-foreground">
-              Authentication has been removed. This is a demo page.
+              Enter admin credentials to access the platform
             </p>
+            <div className="mt-2 p-2 bg-muted rounded-md">
+              <p className="text-xs text-muted-foreground">
+                Use <span className="font-mono">{ADMIN_EMAIL}</span> and password to sign in
+              </p>
+            </div>
           </div>
           
           <Card className="p-6">
-            <form className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input 
                   id="email" 
                   type="email" 
-                  placeholder="email@example.com" 
+                  placeholder="admin@example.com" 
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  required 
                 />
               </div>
               
@@ -66,11 +133,18 @@ const Login = () => {
                   id="password" 
                   type="password" 
                   placeholder="••••••••" 
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required 
                 />
               </div>
               
               <div className="flex items-center space-x-2">
-                <Checkbox id="remember" />
+                <Checkbox 
+                  id="remember" 
+                  checked={formData.remember}
+                  onCheckedChange={handleCheckboxChange}
+                />
                 <label
                   htmlFor="remember"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -79,8 +153,15 @@ const Login = () => {
                 </label>
               </div>
               
-              <Button type="button" className="w-full">
-                Sign In
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <span className="h-4 w-4 mr-2 rounded-full border-2 border-current border-r-transparent animate-spin"></span>
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
               </Button>
             </form>
           </Card>
