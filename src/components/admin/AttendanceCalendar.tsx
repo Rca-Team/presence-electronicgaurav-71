@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
@@ -287,7 +286,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                       present: attendanceDays,
                       late: lateAttendanceDays
                     }}
-                    modifierStyles={{
+                    modifiersStyles={{
                       present: { 
                         backgroundColor: "rgb(34, 197, 94)", 
                         color: "white"
