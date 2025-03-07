@@ -20,7 +20,7 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
     
-    const { operation } = await req.json()
+    const { operation, userId } = await req.json()
     
     // Health check endpoint for model status
     if (operation === 'healthCheck') {
@@ -29,6 +29,29 @@ serve(async (req) => {
           status: 'ok',
           message: 'Face recognition service is running',
           timestamp: new Date().toISOString()
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
+    }
+    
+    // Track attendance count for a specific user
+    if (operation === 'getUserAttendanceCount' && userId) {
+      // Get attendance count for the specific user
+      const { data: attendanceData, error: attendanceError } = await supabaseClient
+        .from('attendance_records')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'present');
+      
+      if (attendanceError) throw attendanceError;
+      
+      return new Response(
+        JSON.stringify({
+          count: attendanceData?.length || 0,
+          userId: userId
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

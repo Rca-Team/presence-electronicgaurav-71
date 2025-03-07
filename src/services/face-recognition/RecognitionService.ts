@@ -144,6 +144,7 @@ export async function recordAttendance(
   confidenceScore: number = 1.0
 ): Promise<boolean> {
   try {
+    // First, insert the attendance record
     const { error } = await supabase
       .from('attendance_records')
       .insert({
@@ -161,10 +162,78 @@ export async function recordAttendance(
       return false;
     }
     
+    // Now find the registration record to update the total count
+    const { data: registrations, error: fetchError } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .eq('status', 'present')
+      .contains('device_info', { 
+        registration: true,
+        employee_id: userId 
+      });
+      
+    if (fetchError) {
+      console.error('Error fetching registration record:', fetchError);
+      return false;
+    }
+    
+    if (registrations && registrations.length > 0) {
+      // Found registration record, update the total attendance count
+      const registration = registrations[0];
+      const deviceInfo = registration.device_info as any;
+      
+      // Get current attendance count or initialize to 0
+      const currentCount = deviceInfo.total_attendance || 0;
+      
+      // Update the record with incremented attendance count
+      const { error: updateError } = await supabase
+        .from('attendance_records')
+        .update({
+          device_info: {
+            ...deviceInfo,
+            total_attendance: currentCount + 1,
+            last_attendance: new Date().toISOString()
+          }
+        })
+        .eq('id', registration.id);
+        
+      if (updateError) {
+        console.error('Error updating attendance count:', updateError);
+      }
+    }
+    
     console.log('Attendance recorded successfully');
     return true;
   } catch (error) {
     console.error('Error in recordAttendance function:', error);
     return false;
+  }
+}
+
+// New function to get total attendance for a user
+export async function getUserAttendanceCount(userId: string): Promise<number> {
+  try {
+    // Call our Supabase function endpoint
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/face-recognition`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+      },
+      body: JSON.stringify({
+        operation: 'getUserAttendanceCount',
+        userId
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.count || 0;
+  } catch (error) {
+    console.error('Error getting user attendance count:', error);
+    return 0;
   }
 }
