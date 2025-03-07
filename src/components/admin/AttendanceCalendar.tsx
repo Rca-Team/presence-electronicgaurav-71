@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
@@ -49,6 +50,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       fetchSelectedFace(selectedFaceId);
       fetchAttendanceRecords(selectedFaceId);
 
+      // Set up real-time subscription for any attendance changes
       attendanceChannel = supabase
         .channel(`attendance-calendar-${selectedFaceId}`)
         .on('postgres_changes', 
@@ -57,12 +59,18 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
             schema: 'public', 
             table: 'attendance_records'
           }, 
-          () => {
-            console.log('Real-time update received for attendance calendar');
+          (payload) => {
+            console.log('Real-time update received for attendance calendar:', payload);
+            // Refresh data whenever there's a change to attendance records
             fetchAttendanceRecords(selectedFaceId);
+            if (selectedDate) {
+              fetchDailyAttendance(selectedFaceId, selectedDate);
+            }
           }
         )
         .subscribe();
+
+      console.log('Subscribed to real-time updates for attendance calendar');
     } else {
       setSelectedFace(null);
       setAttendanceDays([]);
@@ -72,6 +80,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     return () => {
       if (attendanceChannel) {
         supabase.removeChannel(attendanceChannel);
+        console.log('Unsubscribed from attendance calendar updates');
       }
     };
   }, [selectedFaceId]);
@@ -271,10 +280,21 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                         fontWeight: 'bold' 
                       }
                     }}
-                    styles={{
-                      day: (date) => {
-                        const customStyle = dayClassName(date);
-                        return customStyle ? { className: customStyle } : undefined;
+                    classNames={{
+                      day: "relative inline-flex items-center justify-center"
+                    }}
+                    modifiers={{
+                      present: attendanceDays,
+                      late: lateAttendanceDays
+                    }}
+                    modifierStyles={{
+                      present: { 
+                        backgroundColor: "rgb(34, 197, 94)", 
+                        color: "white"
+                      },
+                      late: { 
+                        backgroundColor: "rgb(245, 158, 11)", 
+                        color: "white"
                       }
                     }}
                   />

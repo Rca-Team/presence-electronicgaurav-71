@@ -15,6 +15,7 @@ const Admin = () => {
   const [selectedFaceId, setSelectedFaceId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeTab, setActiveTab] = useState('faces');
+  const [attendanceUpdated, setAttendanceUpdated] = useState(false);
 
   useEffect(() => {
     // Set up real-time channel for general admin updates
@@ -28,20 +29,35 @@ const Admin = () => {
         },
         (payload) => {
           console.log('Admin dashboard real-time update received:', payload);
+          
+          // Show notification and trigger refresh
+          setAttendanceUpdated(true);
+          
           toast({
-            title: "Data Updated",
-            description: "The attendance data has been updated in real-time.",
+            title: "Attendance Updated",
+            description: "New attendance data has been recorded and updated in real-time.",
             variant: "default",
           });
         }
       )
       .subscribe();
 
+    console.log('Subscribed to admin dashboard real-time updates');
+
     // Clean up subscription on unmount
     return () => {
       supabase.removeChannel(adminChannel);
+      console.log('Unsubscribed from admin dashboard updates');
     };
   }, [toast]);
+
+  // Reset the update flag after a short delay
+  useEffect(() => {
+    if (attendanceUpdated) {
+      const timer = setTimeout(() => setAttendanceUpdated(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [attendanceUpdated]);
 
   return (
     <PageLayout>
@@ -64,10 +80,22 @@ const Admin = () => {
           <TabsTrigger value="faces" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             <span>Registered Faces</span>
+            {attendanceUpdated && (
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             <span>Attendance Calendar</span>
+            {attendanceUpdated && (
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="faces" className="space-y-4">
