@@ -44,13 +44,38 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
   });
 
   useEffect(() => {
+    let attendanceChannel: any = null;
+
     if (selectedFaceId) {
       fetchSelectedFace(selectedFaceId);
       fetchAttendanceRecords(selectedFaceId);
+
+      // Set up real-time subscription for attendance updates
+      attendanceChannel = supabase
+        .channel(`attendance-calendar-${selectedFaceId}`)
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'attendance_records'
+          }, 
+          () => {
+            console.log('Real-time update received for attendance calendar');
+            fetchAttendanceRecords(selectedFaceId);
+          }
+        )
+        .subscribe();
     } else {
       setSelectedFace(null);
       setAttendanceDays([]);
     }
+
+    // Clean up subscription on unmount or when selectedFaceId changes
+    return () => {
+      if (attendanceChannel) {
+        supabase.removeChannel(attendanceChannel);
+      }
+    };
   }, [selectedFaceId]);
 
   useEffect(() => {

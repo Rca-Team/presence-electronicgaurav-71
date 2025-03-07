@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PageLayout from '@/components/layouts/PageLayout';
 import { PageHeader } from '@/components/ui/page-header';
 import AdminFacesList from '@/components/admin/AdminFacesList';
@@ -7,23 +7,59 @@ import AttendanceCalendar from '@/components/admin/AttendanceCalendar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, Calendar } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const Admin = () => {
+  const { toast } = useToast();
   const [selectedFaceId, setSelectedFaceId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [activeTab, setActiveTab] = useState('faces');
+
+  useEffect(() => {
+    // Set up real-time channel for general admin updates
+    const adminChannel = supabase
+      .channel('admin-dashboard')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'attendance_records' 
+        },
+        (payload) => {
+          console.log('Admin dashboard real-time update received:', payload);
+          toast({
+            title: "Data Updated",
+            description: "The attendance data has been updated in real-time.",
+            variant: "default",
+          });
+        }
+      )
+      .subscribe();
+
+    // Clean up subscription on unmount
+    return () => {
+      supabase.removeChannel(adminChannel);
+    };
+  }, [toast]);
 
   return (
     <PageLayout>
       <PageHeader 
         title="Admin Dashboard" 
-        description="Manage registered faces and view detailed attendance records"
+        description="Manage registered faces and view detailed attendance records in real-time"
       >
         <Button variant="outline" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
           {viewMode === 'grid' ? 'List View' : 'Grid View'}
         </Button>
       </PageHeader>
 
-      <Tabs defaultValue="faces" className="w-full">
+      <Tabs 
+        defaultValue="faces" 
+        className="w-full"
+        value={activeTab}
+        onValueChange={setActiveTab}
+      >
         <TabsList className="mb-6">
           <TabsTrigger value="faces" className="flex items-center gap-2">
             <User className="h-4 w-4" />
@@ -38,7 +74,12 @@ const Admin = () => {
           <AdminFacesList 
             viewMode={viewMode} 
             selectedFaceId={selectedFaceId} 
-            setSelectedFaceId={setSelectedFaceId} 
+            setSelectedFaceId={(id) => {
+              setSelectedFaceId(id);
+              if (id) {
+                setActiveTab('calendar');
+              }
+            }} 
           />
         </TabsContent>
         <TabsContent value="calendar">

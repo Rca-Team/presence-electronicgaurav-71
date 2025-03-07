@@ -52,6 +52,27 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
 
   useEffect(() => {
     fetchRegisteredFaces();
+
+    // Set up real-time subscriptions
+    const attendanceChannel = supabase
+      .channel('attendance-changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'attendance_records',
+        }, 
+        () => {
+          console.log('Real-time update received for attendance_records');
+          fetchRegisteredFaces();
+        }
+      )
+      .subscribe();
+
+    // Clean up subscription on unmount
+    return () => {
+      supabase.removeChannel(attendanceChannel);
+    };
   }, []);
 
   const fetchRegisteredFaces = async () => {
