@@ -25,7 +25,7 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ isLoading, activityData
           .from('attendance_records')
           .select('*, user_id')
           .order('timestamp', { ascending: false })
-          .limit(5);
+          .limit(10); // Increased limit to show more records
           
         if (error) {
           console.error('Error fetching recent activity:', error);
@@ -33,7 +33,38 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ isLoading, activityData
         }
         
         if (data) {
-          setActivityData(data);
+          // Process the data to extract user info from device_info
+          const processedData = await Promise.all(data.map(async (record) => {
+            let name = 'Unknown';
+            
+            // Try to get name from device_info
+            if (record.device_info && typeof record.device_info === 'object') {
+              const deviceInfo = record.device_info;
+              if (deviceInfo.metadata && deviceInfo.metadata.name) {
+                name = deviceInfo.metadata.name;
+              }
+            }
+            
+            // If no name in device_info, try to get from profiles table
+            if (name === 'Unknown' && record.user_id) {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', record.user_id)
+                .maybeSingle();
+                
+              if (profileData && profileData.username) {
+                name = profileData.username;
+              }
+            }
+            
+            return {
+              ...record,
+              displayName: name
+            };
+          }));
+          
+          setActivityData(processedData);
         }
       } catch (err) {
         console.error('Failed to fetch recent activity:', err);
@@ -62,15 +93,14 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ isLoading, activityData
           </>
         ) : (
           activityData?.map((item: any, index: number) => {
-            const deviceInfo = item.device_info && typeof item.device_info === 'object' ? item.device_info : null;
-            const metadata = deviceInfo?.metadata || {};
-            const name = metadata.name || `User ${item.user_id?.substring(0, 4) || 'Unknown'}`;
+            // Extract name from processed data
+            const name = item.displayName || 'Unknown';
             const time = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const status = item.status === 'present' ? 'Checked in' : 
                           item.status === 'late' ? 'Checked in (Late)' : 'Unauthorized';
             
             return (
-              <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+              <div key={`${item.id}-${index}`} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <span className="text-primary font-medium">{name.charAt(0)}</span>
@@ -92,6 +122,12 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ isLoading, activityData
               </div>
             );
           }) || []
+        )}
+        
+        {!isLoading && activityData?.length === 0 && (
+          <div className="text-center py-4 text-muted-foreground">
+            No recent activity
+          </div>
         )}
       </div>
     </Card>

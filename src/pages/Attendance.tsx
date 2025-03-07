@@ -53,9 +53,9 @@ const Attendance = () => {
     const fetchRecentAttendance = async () => {
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance_records')
-        .select('id, status, timestamp, confidence_score, user_id')
+        .select('id, status, timestamp, confidence_score, user_id, device_info')
         .order('timestamp', { ascending: false })
-        .limit(10);
+        .limit(10); // Show all records up to limit (not filtering by user)
         
       if (attendanceError) {
         console.error('Error fetching recent attendance:', attendanceError);
@@ -67,7 +67,16 @@ const Attendance = () => {
           attendanceData.map(async (record) => {
             let username = 'Unknown';
             
-            if (record.user_id) {
+            // Try to get name from device_info first
+            if (record.device_info && typeof record.device_info === 'object') {
+              const deviceInfo = record.device_info;
+              if (deviceInfo.metadata && deviceInfo.metadata.name) {
+                username = deviceInfo.metadata.name;
+              }
+            }
+            
+            // If no name in device_info, try to get from profiles table
+            if (username === 'Unknown' && record.user_id) {
               const { data: profileData } = await supabase
                 .from('profiles')
                 .select('username')
@@ -83,7 +92,8 @@ const Attendance = () => {
               name: username,
               time: new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               status: record.status === 'present' ? 'Present' : 'Unauthorized',
-              confidence: record.confidence_score
+              confidence: record.confidence_score,
+              id: record.id // Include ID to ensure unique keys
             };
           })
         );
@@ -392,7 +402,7 @@ const Attendance = () => {
                   {recentAttendance.length > 0 ? (
                     recentAttendance.map((record, index) => (
                       <div 
-                        key={index} 
+                        key={`${record.id || index}`} 
                         className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
                       >
                         <div className="flex items-center gap-3">
