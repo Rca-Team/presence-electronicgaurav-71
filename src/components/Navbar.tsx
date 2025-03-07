@@ -59,13 +59,8 @@ const Navbar = () => {
           ))}
         </nav>
         
-        {/* Sign In / Get Started buttons - Only show on desktop */}
+        {/* Get Started button - Only show on desktop */}
         <div className="hidden md:flex items-center space-x-4 animate-fade-in">
-          <Link to="/login">
-            <Button variant="ghost" size="sm">
-              Sign In
-            </Button>
-          </Link>
           <Link to="/register">
             <Button size="sm" className="animate-pulse-subtle">
               Get Started

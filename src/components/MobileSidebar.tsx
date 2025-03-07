@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { Home, BarChart, UserPlus, Clock, Menu, User, ShieldCheck } from 'lucide-react';
+import { Home, BarChart, UserPlus, Clock, Menu, ShieldCheck } from 'lucide-react';
 import Logo from './Logo';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -70,12 +70,6 @@ const MobileSidebar = () => {
             </nav>
             
             <div className="p-4 border-t space-y-2">
-              <Link to="/login" className="block">
-                <Button variant="outline" className="w-full justify-start">
-                  <User className="h-4 w-4 mr-2" />
-                  Sign In
-                </Button>
-              </Link>
               <Link to="/register" className="block">
                 <Button className="w-full justify-start">
                   <UserPlus className="h-4 w-4 mr-2" />
