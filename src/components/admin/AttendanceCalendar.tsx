@@ -184,8 +184,8 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
   };
 
   // Function to render the date content with attendance status
-  const renderDay = (day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
+  const renderDay = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
     const attendance = attendanceDays.find(
       a => format(new Date(a.date), 'yyyy-MM-dd') === dateStr
     );
@@ -304,10 +304,10 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                     onSelect={setDate}
                     className="rounded-md border"
                     components={{
-                      DayContent: ({ day }) => (
+                      DayContent: ({ date }) => (
                         <>
-                          <div>{format(day, 'd')}</div>
-                          {renderDay(day)}
+                          <div>{format(date, 'd')}</div>
+                          {renderDay(date)}
                         </>
                       ),
                     }}
