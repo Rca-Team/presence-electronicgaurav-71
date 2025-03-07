@@ -1,47 +1,49 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
-import { CheckCircle2, XCircle, Calendar as CalendarIcon, User } from 'lucide-react';
+import { UserCheck, Clock } from 'lucide-react';
 
 interface AttendanceCalendarProps {
   selectedFaceId: string | null;
 }
 
-interface AttendanceDay {
-  date: Date;
-  status: 'present' | 'absent';
-  timestamp: string;
-}
-
-interface SelectedFace {
-  id: string;
-  name: string;
-  employee_id: string;
-  department: string;
-  image_url: string;
-  position?: string;
-}
-
 const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId }) => {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [attendanceDays, setAttendanceDays] = useState<AttendanceDay[]>([]);
-  const [selectedFace, setSelectedFace] = useState<SelectedFace | null>(null);
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [monthAttendance, setMonthAttendance] = useState<{
-    present: number;
-    absent: number;
-    total: number;
-  }>({
-    present: 0,
-    absent: 0,
-    total: 0
-  });
+  const [attendanceDays, setAttendanceDays] = useState<Date[]>([]);
+  const [lateAttendanceDays, setLateAttendanceDays] = useState<Date[]>([]);
+  const [selectedFace, setSelectedFace] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [loading, setLoading] = useState(false);
+  const [dailyAttendance, setDailyAttendance] = useState<{
+    id: string;
+    timestamp: string;
+    status: string;
+  }[]>([]);
+
+  // Function to check if a date exists in an array of dates
+  const isDateInArray = (date: Date, dateArray: Date[]): boolean => {
+    return dateArray.some(d => 
+      d.getFullYear() === date.getFullYear() &&
+      d.getMonth() === date.getMonth() &&
+      d.getDate() === date.getDate()
+    );
+  };
+
+  // Custom day rendering
+  const dayClassName = (date: Date) => {
+    if (isDateInArray(date, lateAttendanceDays)) {
+      return "bg-amber-500 text-white hover:bg-amber-600";
+    }
+    if (isDateInArray(date, attendanceDays)) {
+      return "bg-green-500 text-white hover:bg-green-600";
+    }
+    return "";
+  };
 
   useEffect(() => {
     let attendanceChannel: any = null;
@@ -68,6 +70,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     } else {
       setSelectedFace(null);
       setAttendanceDays([]);
+      setLateAttendanceDays([]);
     }
 
     // Clean up subscription on unmount or when selectedFaceId changes
@@ -79,10 +82,12 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
   }, [selectedFaceId]);
 
   useEffect(() => {
-    if (date && selectedFaceId) {
-      calculateMonthStats(date);
+    if (selectedFaceId && selectedDate) {
+      fetchDailyAttendance(selectedFaceId, selectedDate);
+    } else {
+      setDailyAttendance([]);
     }
-  }, [date, attendanceDays]);
+  }, [selectedFaceId, selectedDate]);
 
   const fetchSelectedFace = async (faceId: string) => {
     try {
@@ -99,82 +104,84 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         const metadata = deviceInfo?.metadata || {};
         
         setSelectedFace({
-          id: data.id,
           name: metadata.name || 'Unknown',
           employee_id: metadata.employee_id || 'N/A',
           department: metadata.department || 'N/A',
           position: metadata.position || 'Student',
-          image_url: metadata.firebase_image_url || ''
         });
       }
     } catch (error) {
-      console.error('Error fetching selected face:', error);
+      console.error('Error fetching face details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load face details",
+        variant: "destructive"
+      });
     }
   };
 
   const fetchAttendanceRecords = async (faceId: string) => {
     try {
-      setIsLoading(true);
+      setLoading(true);
       
-      // First, get the employee_id from the selected face
+      // First, get the employee_id associated with this face
       const { data: faceData, error: faceError } = await supabase
         .from('attendance_records')
-        .select('device_info')
+        .select('*')
         .eq('id', faceId)
         .single();
-        
+      
       if (faceError) throw faceError;
+      
+      if (!faceData || !faceData.device_info) {
+        setAttendanceDays([]);
+        setLateAttendanceDays([]);
+        return;
+      }
       
       const deviceInfo = faceData.device_info as any;
       const employeeId = deviceInfo?.metadata?.employee_id;
       
       if (!employeeId) {
-        toast({
-          title: "Error",
-          description: "Could not identify employee ID for attendance records",
-          variant: "destructive"
-        });
-        setIsLoading(false);
+        setAttendanceDays([]);
+        setLateAttendanceDays([]);
         return;
       }
       
-      // Now fetch all attendance records for this employee_id
-      const { data, error } = await supabase
+      // Then, get all attendance records for this employee_id
+      const { data: records, error } = await supabase
         .from('attendance_records')
         .select('*')
         .contains('device_info', { employee_id: employeeId })
-        .order('timestamp', { ascending: false });
+        .eq('status', 'present');
         
       if (error) throw error;
       
-      // Process the attendance data
-      const attendanceMap = new Map<string, AttendanceDay>();
+      // Get late attendance records
+      const { data: lateRecords, error: lateError } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .contains('device_info', { employee_id: employeeId })
+        .eq('status', 'late');
+        
+      if (lateError) throw lateError;
       
-      if (data) {
-        data.forEach(record => {
-          if (record.timestamp) {
-            const date = new Date(record.timestamp);
-            const dateString = format(date, 'yyyy-MM-dd');
-            
-            // Only add if this date hasn't been recorded yet (take the earliest record for each day)
-            if (!attendanceMap.has(dateString)) {
-              attendanceMap.set(dateString, {
-                date,
-                status: record.status === 'present' ? 'present' : 'absent',
-                timestamp: record.timestamp
-              });
-            }
-          }
-        });
+      // Process present attendance records
+      if (records) {
+        const days = records.map(record => 
+          record.timestamp ? new Date(record.timestamp) : null
+        ).filter(date => date !== null) as Date[];
         
-        // Convert map to array
-        const attendanceArray = Array.from(attendanceMap.values());
-        setAttendanceDays(attendanceArray);
+        setAttendanceDays(days);
+      }
+      
+      // Process late attendance records
+      if (lateRecords) {
+        const lateDays = lateRecords.map(record => 
+          record.timestamp ? new Date(record.timestamp) : null
+        ).filter(date => date !== null) as Date[];
         
-        // Calculate stats for the current month
-        if (date) {
-          calculateMonthStats(date);
-        }
+        setLateAttendanceDays(lateDays);
       }
     } catch (error) {
       console.error('Error fetching attendance records:', error);
@@ -184,179 +191,188 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const calculateMonthStats = (selectedDate: Date) => {
-    const year = selectedDate.getFullYear();
-    const month = selectedDate.getMonth();
-    
-    // Filter for records in the selected month
-    const monthRecords = attendanceDays.filter(day => {
-      const recordDate = new Date(day.date);
-      return recordDate.getFullYear() === year && recordDate.getMonth() === month;
-    });
-    
-    const present = monthRecords.filter(day => day.status === 'present').length;
-    const total = monthRecords.length;
-    
-    setMonthAttendance({
-      present,
-      absent: total - present,
-      total
-    });
-  };
-
-  // Function to render the date content with attendance status
-  const renderDay = (date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const attendance = attendanceDays.find(
-      a => format(new Date(a.date), 'yyyy-MM-dd') === dateStr
-    );
-    
-    if (!attendance) return null;
-    
-    return (
-      <div className="flex items-center justify-center w-full h-full">
-        {attendance.status === 'present' ? (
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-        ) : (
-          <XCircle className="h-4 w-4 text-red-500" />
-        )}
-      </div>
-    );
+  const fetchDailyAttendance = async (faceId: string, date: Date) => {
+    try {
+      // First, get the employee_id associated with this face
+      const { data: faceData, error: faceError } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('id', faceId)
+        .single();
+      
+      if (faceError) throw faceError;
+      
+      if (!faceData || !faceData.device_info) {
+        setDailyAttendance([]);
+        return;
+      }
+      
+      const deviceInfo = faceData.device_info as any;
+      const employeeId = deviceInfo?.metadata?.employee_id;
+      
+      if (!employeeId) {
+        setDailyAttendance([]);
+        return;
+      }
+      
+      // Format the date for querying
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      // Get all attendance records for this employee_id on the selected date
+      const { data: records, error } = await supabase
+        .from('attendance_records')
+        .select('id, timestamp, status')
+        .contains('device_info', { employee_id: employeeId })
+        .gte('timestamp', startOfDay.toISOString())
+        .lte('timestamp', endOfDay.toISOString())
+        .order('timestamp', { ascending: true });
+        
+      if (error) throw error;
+      
+      if (records) {
+        setDailyAttendance(records);
+      }
+    } catch (error) {
+      console.error('Error fetching daily attendance:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load daily attendance details",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
     <div className="space-y-6">
       {selectedFaceId ? (
         <>
-          {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-4 w-32" />
+                <CardTitle>Attendance Calendar</CardTitle>
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-64 w-full" />
-              </CardContent>
-            </Card>
-          ) : selectedFace ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="md:col-span-1">
-                <CardHeader>
-                  <CardTitle>Attendance Summary</CardTitle>
-                  <CardDescription>
-                    {format(date || new Date(), 'MMMM yyyy')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col space-y-4">
-                    <div className="flex items-center gap-3">
-                      {selectedFace.image_url ? (
-                        <img 
-                          src={selectedFace.image_url} 
-                          alt={selectedFace.name} 
-                          className="h-16 w-16 rounded-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${selectedFace.name}&background=random`;
-                          }}
-                        />
-                      ) : (
-                        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                          <User className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="font-medium text-lg">{selectedFace.name}</h3>
-                        <p className="text-sm text-muted-foreground">{selectedFace.department}</p>
-                      </div>
+                <div className="flex flex-col items-center">
+                  <div className="mb-4 flex space-x-4">
+                    <div className="flex items-center">
+                      <div className="h-3 w-3 rounded-full bg-green-500 mr-2"></div>
+                      <span className="text-sm">Present</span>
                     </div>
-                    
-                    <div className="pt-4 space-y-3">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-muted/50 rounded-lg p-3 text-center">
-                          <p className="text-sm text-muted-foreground">Present</p>
-                          <p className="text-2xl font-semibold text-green-600">{monthAttendance.present}</p>
-                        </div>
-                        <div className="bg-muted/50 rounded-lg p-3 text-center">
-                          <p className="text-sm text-muted-foreground">Absent</p>
-                          <p className="text-2xl font-semibold text-red-600">{monthAttendance.absent}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-muted/50 rounded-lg p-3 text-center">
-                        <p className="text-sm text-muted-foreground">Attendance Rate</p>
-                        <p className="text-2xl font-semibold">
-                          {monthAttendance.total > 0 
-                            ? `${Math.round((monthAttendance.present / monthAttendance.total) * 100)}%` 
-                            : 'N/A'}
-                        </p>
-                      </div>
-                      
-                      <div className="flex justify-between items-center pt-3">
-                        <div className="flex items-center gap-1">
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          <span className="text-sm">Present</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <XCircle className="h-4 w-4 text-red-500" />
-                          <span className="text-sm">Absent</span>
-                        </div>
-                      </div>
+                    <div className="flex items-center">
+                      <div className="h-3 w-3 rounded-full bg-amber-500 mr-2"></div>
+                      <span className="text-sm">Late</span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle>Attendance Calendar</CardTitle>
-                      <CardDescription>
-                        View attendance records for {selectedFace.name}
-                      </CardDescription>
-                    </div>
-                    <CalendarIcon className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </CardHeader>
-                <CardContent>
                   <Calendar
                     mode="single"
-                    selected={date}
-                    onSelect={setDate}
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
                     className="rounded-md border"
+                    modifiersClassNames={{
+                      selected: "bg-primary",
+                    }}
+                    modifiersStyles={{
+                      selected: { 
+                        fontWeight: 'bold' 
+                      }
+                    }}
                     components={{
-                      DayContent: ({ date }) => (
-                        <>
-                          <div>{format(date, 'd')}</div>
-                          {renderDay(date)}
-                        </>
-                      ),
+                      Day: (props) => {
+                        const date = props.date;
+                        const customClassName = dayClassName(date);
+                        return (
+                          <button
+                            {...props}
+                            className={`${props.className} ${customClassName}`}
+                          />
+                        );
+                      }
                     }}
                   />
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <Card className="p-8 text-center">
-              <div className="flex flex-col items-center gap-2">
-                <User className="h-10 w-10 text-muted-foreground" />
-                <h3 className="text-lg font-medium">Face data not found</h3>
-                <p className="text-muted-foreground">The selected face record could not be found</p>
-              </div>
+                </div>
+              </CardContent>
             </Card>
-          )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{selectedFace?.name || 'Student'}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-sm text-muted-foreground">ID:</span>
+                      <p>{selectedFace?.employee_id || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Department:</span>
+                      <p>{selectedFace?.department || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Position:</span>
+                      <p>{selectedFace?.position || 'Student'}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Total Attendance:</span>
+                      <p>{attendanceDays.length + lateAttendanceDays.length} days</p>
+                    </div>
+                  </div>
+
+                  {selectedDate && (
+                    <div className="border-t pt-4 mt-4">
+                      <h3 className="font-medium mb-2">
+                        {format(selectedDate, 'MMMM d, yyyy')} Attendance
+                      </h3>
+                      {dailyAttendance.length > 0 ? (
+                        <div className="space-y-2">
+                          {dailyAttendance.map((record) => (
+                            <div key={record.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                              <div className="flex items-center">
+                                {record.status === 'late' ? (
+                                  <Clock className="h-4 w-4 text-amber-500 mr-2" />
+                                ) : (
+                                  <UserCheck className="h-4 w-4 text-green-500 mr-2" />
+                                )}
+                                <span>
+                                  {format(new Date(record.timestamp), 'h:mm a')}
+                                </span>
+                              </div>
+                              <Badge variant={record.status === 'late' ? "outline" : "default"}>
+                                {record.status === 'late' ? 'Late' : 'Present'}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      ) : isDateInArray(selectedDate, attendanceDays) || isDateInArray(selectedDate, lateAttendanceDays) ? (
+                        <p className="text-sm text-muted-foreground">Loading attendance details...</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No attendance recorded for this date.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </>
       ) : (
-        <Card className="p-8 text-center">
-          <div className="flex flex-col items-center gap-2">
-            <User className="h-10 w-10 text-muted-foreground" />
-            <h3 className="text-lg font-medium">No face selected</h3>
-            <p className="text-muted-foreground">Select a face from the list to view attendance records</p>
-          </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center p-6">
+            <div className="w-full max-w-md text-center">
+              <h3 className="text-lg font-medium mb-2">No student selected</h3>
+              <p className="text-muted-foreground">
+                Select a student from the list to view their attendance calendar.
+              </p>
+            </div>
+          </CardContent>
         </Card>
       )}
     </div>

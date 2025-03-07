@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, User, UserCheck, Calendar, MoreVertical } from 'lucide-react';
+import { Search, User, UserCheck, Calendar, MoreVertical, Clock } from 'lucide-react';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +13,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { format } from 'date-fns';
 
 interface AdminFacesListProps {
   viewMode: 'grid' | 'list';
@@ -42,6 +43,9 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
   const [faces, setFaces] = useState<RegisteredFace[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [attendanceCounts, setAttendanceCounts] = useState<Record<string, number>>({});
+  const [selectedAttendanceId, setSelectedAttendanceId] = useState<string | null>(null);
+  const [newTime, setNewTime] = useState('');
+  const [isTimeDialogOpen, setIsTimeDialogOpen] = useState(false);
 
   // Filter faces based on search term
   const filteredFaces = faces.filter(face => 
@@ -187,6 +191,80 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
     }
   };
 
+  const handleAdjustTime = async (attendanceId: string) => {
+    try {
+      if (!newTime) {
+        toast({
+          title: "Error",
+          description: "Please select a time",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { data: record, error: fetchError } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('id', attendanceId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      
+      if (!record) {
+        throw new Error('Record not found');
+      }
+
+      // Get current date from timestamp
+      const currentDate = new Date(record.timestamp || new Date());
+      
+      // Parse the time string (HH:MM) and set it on the current date
+      const [hours, minutes] = newTime.split(':').map(Number);
+      currentDate.setHours(hours, minutes);
+      
+      // Check if time is late (after 9:00 AM)
+      const isLate = hours > 9 || (hours === 9 && minutes > 0);
+      
+      // Update the attendance record with new timestamp and status
+      const { error: updateError } = await supabase
+        .from('attendance_records')
+        .update({ 
+          timestamp: currentDate.toISOString(),
+          status: isLate ? 'late' : 'present'
+        })
+        .eq('id', attendanceId);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Success",
+        description: `Attendance time adjusted${isLate ? ' and marked as late' : ''}`,
+        variant: "default"
+      });
+
+      setIsTimeDialogOpen(false);
+      fetchRegisteredFaces();
+    } catch (error) {
+      console.error('Error adjusting time:', error);
+      toast({
+        title: "Error",
+        description: "Failed to adjust attendance time",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const openTimeDialog = (id: string) => {
+    const face = faces.find(face => face.id === id);
+    if (face && face.last_attendance && face.last_attendance !== 'Never') {
+      const lastAttendanceDate = new Date(face.last_attendance);
+      setNewTime(format(lastAttendanceDate, 'HH:mm'));
+    } else {
+      setNewTime('09:00');
+    }
+    setSelectedAttendanceId(id);
+    setIsTimeDialogOpen(true);
+  };
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -267,12 +345,22 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
                   <div className="absolute top-2 right-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="icon" className="h-8 w-8 bg-background/80 backdrop-blur-sm">
+                        <Button variant="outline" size="icon" className="h-8 w-8 bg-background/80 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDeleteFace(face.id)}>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          openTimeDialog(face.id);
+                        }}>
+                          <Clock className="mr-2 h-4 w-4" />
+                          Adjust Attendance Time
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteFace(face.id);
+                        }}>
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -365,6 +453,13 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={(e) => {
                             e.stopPropagation();
+                            openTimeDialog(face.id);
+                          }}>
+                            <Clock className="mr-2 h-4 w-4" />
+                            Adjust Attendance Time
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
                             handleDeleteFace(face.id);
                           }}>
                             Delete
@@ -379,6 +474,39 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
           </div>
         </div>
       )}
+
+      <Dialog open={isTimeDialogOpen} onOpenChange={setIsTimeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjust Attendance Time</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <label htmlFor="time-input" className="block text-sm font-medium mb-2">
+              New attendance time:
+            </label>
+            <Input
+              id="time-input"
+              type="time"
+              value={newTime}
+              onChange={(e) => setNewTime(e.target.value)}
+              className="w-full"
+            />
+            <p className="mt-2 text-sm text-muted-foreground">
+              Students will be marked as late if attendance time is after 9:00 AM.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTimeDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => selectedAttendanceId && handleAdjustTime(selectedAttendanceId)}
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
