@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
@@ -25,7 +24,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     status: string;
   }[]>([]);
 
-  // Function to check if a date exists in an array of dates
   const isDateInArray = (date: Date, dateArray: Date[]): boolean => {
     return dateArray.some(d => 
       d.getFullYear() === date.getFullYear() &&
@@ -34,7 +32,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     );
   };
 
-  // Custom day rendering
   const dayClassName = (date: Date) => {
     if (isDateInArray(date, lateAttendanceDays)) {
       return "bg-amber-500 text-white hover:bg-amber-600";
@@ -52,7 +49,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       fetchSelectedFace(selectedFaceId);
       fetchAttendanceRecords(selectedFaceId);
 
-      // Set up real-time subscription for attendance updates
       attendanceChannel = supabase
         .channel(`attendance-calendar-${selectedFaceId}`)
         .on('postgres_changes', 
@@ -73,7 +69,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       setLateAttendanceDays([]);
     }
 
-    // Clean up subscription on unmount or when selectedFaceId changes
     return () => {
       if (attendanceChannel) {
         supabase.removeChannel(attendanceChannel);
@@ -124,7 +119,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     try {
       setLoading(true);
       
-      // First, get the employee_id associated with this face
       const { data: faceData, error: faceError } = await supabase
         .from('attendance_records')
         .select('*')
@@ -148,7 +142,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         return;
       }
       
-      // Then, get all attendance records for this employee_id
       const { data: records, error } = await supabase
         .from('attendance_records')
         .select('*')
@@ -157,7 +150,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         
       if (error) throw error;
       
-      // Get late attendance records
       const { data: lateRecords, error: lateError } = await supabase
         .from('attendance_records')
         .select('*')
@@ -166,7 +158,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         
       if (lateError) throw lateError;
       
-      // Process present attendance records
       if (records) {
         const days = records.map(record => 
           record.timestamp ? new Date(record.timestamp) : null
@@ -175,7 +166,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         setAttendanceDays(days);
       }
       
-      // Process late attendance records
       if (lateRecords) {
         const lateDays = lateRecords.map(record => 
           record.timestamp ? new Date(record.timestamp) : null
@@ -197,7 +187,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
 
   const fetchDailyAttendance = async (faceId: string, date: Date) => {
     try {
-      // First, get the employee_id associated with this face
       const { data: faceData, error: faceError } = await supabase
         .from('attendance_records')
         .select('*')
@@ -219,14 +208,12 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         return;
       }
       
-      // Format the date for querying
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
       
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
       
-      // Get all attendance records for this employee_id on the selected date
       const { data: records, error } = await supabase
         .from('attendance_records')
         .select('id, timestamp, status')
@@ -284,17 +271,10 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                         fontWeight: 'bold' 
                       }
                     }}
-                    components={{
-                      Day: ({ date, ...props }) => {
-                        const customClassName = dayClassName(date);
-                        // Safely access className with a fallback to empty string
-                        const className = (props as any).className || '';
-                        return (
-                          <button
-                            {...props}
-                            className={`${className} ${customClassName}`}
-                          />
-                        );
+                    styles={{
+                      day: (date) => {
+                        const customStyle = dayClassName(date);
+                        return customStyle ? { className: customStyle } : undefined;
                       }
                     }}
                   />
