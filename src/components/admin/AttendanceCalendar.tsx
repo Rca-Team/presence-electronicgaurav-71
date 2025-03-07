@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
@@ -286,10 +287,12 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                     components={{
                       Day: ({ date, ...props }) => {
                         const customClassName = dayClassName(date);
+                        // Safely access className with a fallback to empty string
+                        const className = (props as any).className || '';
                         return (
                           <button
                             {...props}
-                            className={`${props.className || ''} ${customClassName}`}
+                            className={`${className} ${customClassName}`}
                           />
                         );
                       }
