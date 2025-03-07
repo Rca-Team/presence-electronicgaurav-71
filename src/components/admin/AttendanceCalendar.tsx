@@ -12,11 +12,19 @@ interface AttendanceCalendarProps {
   selectedFaceId: string | null;
 }
 
+// Define an interface for student/face information
+interface FaceInfo {
+  name: string;
+  employee_id: string;
+  department: string;
+  position: string;
+}
+
 const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId }) => {
   const { toast } = useToast();
   const [attendanceDays, setAttendanceDays] = useState<Date[]>([]);
   const [lateAttendanceDays, setLateAttendanceDays] = useState<Date[]>([]);
-  const [selectedFace, setSelectedFace] = useState<any>(null);
+  const [selectedFace, setSelectedFace] = useState<FaceInfo | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [loading, setLoading] = useState(false);
   const [dailyAttendance, setDailyAttendance] = useState<{
@@ -95,30 +103,44 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
 
   const fetchSelectedFace = async (faceId: string) => {
     try {
+      // Instead of querying registered_faces which doesn't exist in the type definition,
+      // check the attendance_records for metadata about the face/user
       const { data, error } = await supabase
-        .from('registered_faces')
-        .select('*')
+        .from('attendance_records')
+        .select('device_info, user_id')
         .eq('id', faceId)
         .single();
-
+          
       if (error) {
-        console.error('Error fetching face details:', error);
-        // Try fetching from attendance_records as fallback
-        const { data: attendanceData, error: attendanceError } = await supabase
+        console.error('Error fetching face details from attendance_records:', error);
+        
+        // Try checking by user_id as fallback
+        const { data: userData, error: userError } = await supabase
           .from('attendance_records')
-          .select('*')
-          .eq('id', faceId)
+          .select('device_info')
+          .eq('user_id', faceId)
           .single();
           
-        if (attendanceError) throw attendanceError;
+        if (userError) {
+          console.error('Error fetching face details by user_id:', userError);
+          
+          // Set default face info if nothing is found
+          setSelectedFace({
+            name: 'Unknown Student',
+            employee_id: faceId,
+            department: 'N/A',
+            position: 'Student'
+          });
+          return;
+        }
         
-        if (attendanceData) {
-          const deviceInfo = attendanceData.device_info as any;
+        if (userData) {
+          const deviceInfo = userData.device_info as any;
           const metadata = deviceInfo?.metadata || {};
           
           setSelectedFace({
-            name: metadata.name || 'Unknown',
-            employee_id: metadata.employee_id || 'N/A',
+            name: metadata.name || 'Unknown Student',
+            employee_id: metadata.employee_id || faceId,
             department: metadata.department || 'N/A',
             position: metadata.position || 'Student',
           });
@@ -127,11 +149,14 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       }
 
       if (data) {
+        const deviceInfo = data.device_info as any;
+        const metadata = deviceInfo?.metadata || {};
+        
         setSelectedFace({
-          name: data.name || 'Unknown',
-          employee_id: data.employee_id || 'N/A',
-          department: data.department || 'N/A',
-          position: data.position || 'Student',
+          name: metadata.name || 'Unknown Student',
+          employee_id: metadata.employee_id || data.user_id || faceId,
+          department: metadata.department || 'N/A',
+          position: metadata.position || 'Student',
         });
       }
     } catch (error) {
@@ -141,6 +166,14 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         description: "Failed to load face details",
         variant: "destructive"
       });
+      
+      // Set default values in case of error
+      setSelectedFace({
+        name: 'Unknown Student',
+        employee_id: faceId,
+        department: 'N/A',
+        position: 'Student'
+      });
     }
   };
 
@@ -149,46 +182,14 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       setLoading(true);
       console.log('Fetching attendance records for face ID:', faceId);
       
-      // First, try to get face details to find the employee_id
-      let employeeId: string | null = null;
+      // Try to get attendance records using the face ID in different places
+      const query = supabase.from('attendance_records');
       
-      // Try registered_faces table first
-      const { data: faceData, error: faceError } = await supabase
-        .from('registered_faces')
-        .select('employee_id')
-        .eq('id', faceId)
-        .single();
-      
-      if (!faceError && faceData?.employee_id) {
-        employeeId = faceData.employee_id;
-        console.log('Found employee_id in registered_faces:', employeeId);
-      } else {
-        // If not found, try attendance_records
-        const { data: attendanceData, error: attendanceError } = await supabase
-          .from('attendance_records')
-          .select('device_info')
-          .eq('id', faceId)
-          .single();
-        
-        if (!attendanceError && attendanceData?.device_info) {
-          const deviceInfo = attendanceData.device_info as any;
-          employeeId = deviceInfo?.metadata?.employee_id || null;
-          console.log('Found employee_id in attendance_records:', employeeId);
-        }
-      }
-      
-      if (!employeeId) {
-        console.log('No employee_id found for face ID:', faceId);
-        // Try using the face ID directly as a fallback
-        employeeId = faceId;
-      }
-      
-      // Now fetch all attendance records for this employee
-      const { data: recordsPresent, error: errorPresent } = await supabase
-        .from('attendance_records')
+      // Record might have faceId as its own id or as user_id or in device_info metadata
+      const { data: recordsPresent, error: errorPresent } = await query
         .select('*')
         .eq('status', 'present')
-        .or(`device_info->metadata->employee_id.eq.${employeeId},user_id.eq.${faceId}`);
+        .or(`id.eq.${faceId},user_id.eq.${faceId}`);
       
       if (errorPresent) {
         console.error('Error fetching present records:', errorPresent);
@@ -205,7 +206,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         .from('attendance_records')
         .select('*')
         .eq('status', 'late')
-        .or(`device_info->metadata->employee_id.eq.${employeeId},user_id.eq.${faceId}`);
+        .or(`id.eq.${faceId},user_id.eq.${faceId}`);
       
       if (errorLate) {
         console.error('Error fetching late records:', errorLate);
@@ -246,47 +247,17 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     try {
       console.log('Fetching daily attendance for date:', date);
       
-      // First, try to get face details to find the employee_id
-      let employeeId: string | null = null;
-      
-      // Try registered_faces table first
-      const { data: faceData, error: faceError } = await supabase
-        .from('registered_faces')
-        .select('employee_id')
-        .eq('id', faceId)
-        .single();
-      
-      if (!faceError && faceData?.employee_id) {
-        employeeId = faceData.employee_id;
-      } else {
-        // If not found, try attendance_records
-        const { data: attendanceData, error: attendanceError } = await supabase
-          .from('attendance_records')
-          .select('device_info')
-          .eq('id', faceId)
-          .single();
-        
-        if (!attendanceError && attendanceData?.device_info) {
-          const deviceInfo = attendanceData.device_info as any;
-          employeeId = deviceInfo?.metadata?.employee_id || null;
-        }
-      }
-      
-      if (!employeeId) {
-        // Try using the face ID directly as a fallback
-        employeeId = faceId;
-      }
-      
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
       
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
       
+      // Query by both id and user_id to catch all possible records
       const { data: records, error } = await supabase
         .from('attendance_records')
         .select('id, timestamp, status')
-        .or(`device_info->metadata->employee_id.eq.${employeeId},user_id.eq.${faceId}`)
+        .or(`id.eq.${faceId},user_id.eq.${faceId}`)
         .gte('timestamp', startOfDay.toISOString())
         .lte('timestamp', endOfDay.toISOString())
         .order('timestamp', { ascending: true });
