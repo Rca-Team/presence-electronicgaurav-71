@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
@@ -95,22 +96,42 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
   const fetchSelectedFace = async (faceId: string) => {
     try {
       const { data, error } = await supabase
-        .from('attendance_records')
+        .from('registered_faces')
         .select('*')
         .eq('id', faceId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching face details:', error);
+        // Try fetching from attendance_records as fallback
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('id', faceId)
+          .single();
+          
+        if (attendanceError) throw attendanceError;
+        
+        if (attendanceData) {
+          const deviceInfo = attendanceData.device_info as any;
+          const metadata = deviceInfo?.metadata || {};
+          
+          setSelectedFace({
+            name: metadata.name || 'Unknown',
+            employee_id: metadata.employee_id || 'N/A',
+            department: metadata.department || 'N/A',
+            position: metadata.position || 'Student',
+          });
+          return;
+        }
+      }
 
       if (data) {
-        const deviceInfo = data.device_info as any;
-        const metadata = deviceInfo?.metadata || {};
-        
         setSelectedFace({
-          name: metadata.name || 'Unknown',
-          employee_id: metadata.employee_id || 'N/A',
-          department: metadata.department || 'N/A',
-          position: metadata.position || 'Student',
+          name: data.name || 'Unknown',
+          employee_id: data.employee_id || 'N/A',
+          department: data.department || 'N/A',
+          position: data.position || 'Student',
         });
       }
     } catch (error) {
@@ -126,63 +147,91 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
   const fetchAttendanceRecords = async (faceId: string) => {
     try {
       setLoading(true);
+      console.log('Fetching attendance records for face ID:', faceId);
       
+      // First, try to get face details to find the employee_id
+      let employeeId: string | null = null;
+      
+      // Try registered_faces table first
       const { data: faceData, error: faceError } = await supabase
-        .from('attendance_records')
-        .select('*')
+        .from('registered_faces')
+        .select('employee_id')
         .eq('id', faceId)
         .single();
       
-      if (faceError) throw faceError;
-      
-      if (!faceData || !faceData.device_info) {
-        setAttendanceDays([]);
-        setLateAttendanceDays([]);
-        return;
+      if (!faceError && faceData?.employee_id) {
+        employeeId = faceData.employee_id;
+        console.log('Found employee_id in registered_faces:', employeeId);
+      } else {
+        // If not found, try attendance_records
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance_records')
+          .select('device_info')
+          .eq('id', faceId)
+          .single();
+        
+        if (!attendanceError && attendanceData?.device_info) {
+          const deviceInfo = attendanceData.device_info as any;
+          employeeId = deviceInfo?.metadata?.employee_id || null;
+          console.log('Found employee_id in attendance_records:', employeeId);
+        }
       }
-      
-      const deviceInfo = faceData.device_info as any;
-      const employeeId = deviceInfo?.metadata?.employee_id;
       
       if (!employeeId) {
-        setAttendanceDays([]);
-        setLateAttendanceDays([]);
-        return;
+        console.log('No employee_id found for face ID:', faceId);
+        // Try using the face ID directly as a fallback
+        employeeId = faceId;
       }
       
-      const { data: records, error } = await supabase
+      // Now fetch all attendance records for this employee
+      const { data: recordsPresent, error: errorPresent } = await supabase
         .from('attendance_records')
         .select('*')
-        .contains('device_info', { employee_id: employeeId })
-        .eq('status', 'present');
-        
-      if (error) throw error;
+        .eq('status', 'present')
+        .or(`device_info->metadata->employee_id.eq.${employeeId},user_id.eq.${faceId}`);
       
-      const { data: lateRecords, error: lateError } = await supabase
+      if (errorPresent) {
+        console.error('Error fetching present records:', errorPresent);
+        toast({
+          title: "Error",
+          description: "Failed to load attendance records",
+          variant: "destructive"
+        });
+      } else {
+        console.log('Present records found:', recordsPresent?.length || 0);
+      }
+      
+      const { data: recordsLate, error: errorLate } = await supabase
         .from('attendance_records')
         .select('*')
-        .contains('device_info', { employee_id: employeeId })
-        .eq('status', 'late');
-        
-      if (lateError) throw lateError;
+        .eq('status', 'late')
+        .or(`device_info->metadata->employee_id.eq.${employeeId},user_id.eq.${faceId}`);
       
-      if (records) {
-        const days = records.map(record => 
-          record.timestamp ? new Date(record.timestamp) : null
-        ).filter(date => date !== null) as Date[];
+      if (errorLate) {
+        console.error('Error fetching late records:', errorLate);
+      } else {
+        console.log('Late records found:', recordsLate?.length || 0);
+      }
+      
+      if (recordsPresent) {
+        const days = recordsPresent
+          .map(record => record.timestamp ? new Date(record.timestamp) : null)
+          .filter(date => date !== null) as Date[];
         
+        console.log('Setting present days:', days.length);
         setAttendanceDays(days);
       }
       
-      if (lateRecords) {
-        const lateDays = lateRecords.map(record => 
-          record.timestamp ? new Date(record.timestamp) : null
-        ).filter(date => date !== null) as Date[];
+      if (recordsLate) {
+        const lateDays = recordsLate
+          .map(record => record.timestamp ? new Date(record.timestamp) : null)
+          .filter(date => date !== null) as Date[];
         
+        console.log('Setting late days:', lateDays.length);
         setLateAttendanceDays(lateDays);
       }
     } catch (error) {
-      console.error('Error fetching attendance records:', error);
+      console.error('Error in fetchAttendanceRecords:', error);
       toast({
         title: "Error",
         description: "Failed to load attendance records",
@@ -195,25 +244,37 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
 
   const fetchDailyAttendance = async (faceId: string, date: Date) => {
     try {
+      console.log('Fetching daily attendance for date:', date);
+      
+      // First, try to get face details to find the employee_id
+      let employeeId: string | null = null;
+      
+      // Try registered_faces table first
       const { data: faceData, error: faceError } = await supabase
-        .from('attendance_records')
-        .select('*')
+        .from('registered_faces')
+        .select('employee_id')
         .eq('id', faceId)
         .single();
       
-      if (faceError) throw faceError;
-      
-      if (!faceData || !faceData.device_info) {
-        setDailyAttendance([]);
-        return;
+      if (!faceError && faceData?.employee_id) {
+        employeeId = faceData.employee_id;
+      } else {
+        // If not found, try attendance_records
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance_records')
+          .select('device_info')
+          .eq('id', faceId)
+          .single();
+        
+        if (!attendanceError && attendanceData?.device_info) {
+          const deviceInfo = attendanceData.device_info as any;
+          employeeId = deviceInfo?.metadata?.employee_id || null;
+        }
       }
       
-      const deviceInfo = faceData.device_info as any;
-      const employeeId = deviceInfo?.metadata?.employee_id;
-      
       if (!employeeId) {
-        setDailyAttendance([]);
-        return;
+        // Try using the face ID directly as a fallback
+        employeeId = faceId;
       }
       
       const startOfDay = new Date(date);
@@ -225,18 +286,22 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       const { data: records, error } = await supabase
         .from('attendance_records')
         .select('id, timestamp, status')
-        .contains('device_info', { employee_id: employeeId })
+        .or(`device_info->metadata->employee_id.eq.${employeeId},user_id.eq.${faceId}`)
         .gte('timestamp', startOfDay.toISOString())
         .lte('timestamp', endOfDay.toISOString())
         .order('timestamp', { ascending: true });
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching daily attendance:', error);
+        throw error;
+      }
       
       if (records) {
+        console.log('Daily attendance records found:', records.length);
         setDailyAttendance(records);
       }
     } catch (error) {
-      console.error('Error fetching daily attendance:', error);
+      console.error('Error in fetchDailyAttendance:', error);
       toast({
         title: "Error",
         description: "Failed to load daily attendance details",
@@ -277,16 +342,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                     modifiersStyles={{
                       selected: { 
                         fontWeight: 'bold' 
-                      }
-                    }}
-                    classNames={{
-                      day: "relative inline-flex items-center justify-center"
-                    }}
-                    modifiers={{
-                      present: attendanceDays,
-                      late: lateAttendanceDays
-                    }}
-                    modifiersStyles={{
+                      },
                       present: { 
                         backgroundColor: "rgb(34, 197, 94)", 
                         color: "white"
@@ -295,6 +351,13 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                         backgroundColor: "rgb(245, 158, 11)", 
                         color: "white"
                       }
+                    }}
+                    classNames={{
+                      day: "relative inline-flex items-center justify-center"
+                    }}
+                    modifiers={{
+                      present: attendanceDays,
+                      late: lateAttendanceDays
                     }}
                   />
                 </div>
