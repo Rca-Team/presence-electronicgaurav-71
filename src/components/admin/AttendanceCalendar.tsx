@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
@@ -10,6 +9,7 @@ import { CheckCircle2, XCircle, Calendar as CalendarIcon, User } from 'lucide-re
 
 interface AttendanceCalendarProps {
   selectedFaceId: string | null;
+  updateTrigger?: number; // Add update trigger prop
 }
 
 interface AttendanceDay {
@@ -27,7 +27,7 @@ interface SelectedFace {
   position?: string;
 }
 
-const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId }) => {
+const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId, updateTrigger = 0 }) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [attendanceDays, setAttendanceDays] = useState<AttendanceDay[]>([]);
@@ -51,7 +51,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       setSelectedFace(null);
       setAttendanceDays([]);
     }
-  }, [selectedFaceId]);
+  }, [selectedFaceId, updateTrigger]);
 
   useEffect(() => {
     if (date && selectedFaceId) {
@@ -91,7 +91,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     try {
       setIsLoading(true);
       
-      // First, get the employee_id from the selected face
       const { data: faceData, error: faceError } = await supabase
         .from('attendance_records')
         .select('device_info')
@@ -113,7 +112,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         return;
       }
       
-      // Now fetch all attendance records for this employee_id
       const { data, error } = await supabase
         .from('attendance_records')
         .select('*')
@@ -122,7 +120,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         
       if (error) throw error;
       
-      // Process the attendance data
       const attendanceMap = new Map<string, AttendanceDay>();
       
       if (data) {
@@ -131,7 +128,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
             const date = new Date(record.timestamp);
             const dateString = format(date, 'yyyy-MM-dd');
             
-            // Only add if this date hasn't been recorded yet (take the earliest record for each day)
             if (!attendanceMap.has(dateString)) {
               attendanceMap.set(dateString, {
                 date,
@@ -142,11 +138,9 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
           }
         });
         
-        // Convert map to array
         const attendanceArray = Array.from(attendanceMap.values());
         setAttendanceDays(attendanceArray);
         
-        // Calculate stats for the current month
         if (date) {
           calculateMonthStats(date);
         }
@@ -167,7 +161,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     const year = selectedDate.getFullYear();
     const month = selectedDate.getMonth();
     
-    // Filter for records in the selected month
     const monthRecords = attendanceDays.filter(day => {
       const recordDate = new Date(day.date);
       return recordDate.getFullYear() === year && recordDate.getMonth() === month;
@@ -183,7 +176,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     });
   };
 
-  // Function to render the date content with attendance status
   const renderDay = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const attendance = attendanceDays.find(
