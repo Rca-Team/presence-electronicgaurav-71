@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,11 +10,11 @@ import Register from "./pages/Register";
 import Attendance from "./pages/Attendance";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import Admin from './pages/Admin';
 
 const queryClient = new QueryClient();
 
-const App = () => {
-  // Add page transition class when navigating
+function App() {
   useEffect(() => {
     const handleNavigation = () => {
       const mainContent = document.querySelector('main');
@@ -42,6 +41,7 @@ const App = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/register" element={<Register />} />
             <Route path="/attendance" element={<Attendance />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="/login" element={<Login />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
@@ -49,6 +49,6 @@ const App = () => {
       </TooltipProvider>
     </QueryClientProvider>
   );
-};
+}
 
 export default App;
