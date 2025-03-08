@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -235,6 +236,17 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
 
       if (updateError) throw updateError;
 
+      // Update the faces array with the new timestamp
+      setFaces(prev => prev.map(face => {
+        if (face.id === attendanceId) {
+          return {
+            ...face,
+            last_attendance: currentDate.toISOString()
+          };
+        }
+        return face;
+      }));
+
       toast({
         title: "Success",
         description: `Attendance time adjusted${isLate ? ' and marked as late' : ''}`,
@@ -242,6 +254,7 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
       });
 
       setIsTimeDialogOpen(false);
+      // Refresh the list to get updated data
       fetchRegisteredFaces();
     } catch (error) {
       console.error('Error adjusting time:', error);
@@ -254,15 +267,45 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
   };
 
   const openTimeDialog = (id: string) => {
+    // Find the current face record to get the latest timestamp
     const face = faces.find(face => face.id === id);
-    if (face && face.last_attendance && face.last_attendance !== 'Never') {
-      const lastAttendanceDate = new Date(face.last_attendance);
-      setNewTime(format(lastAttendanceDate, 'HH:mm'));
-    } else {
-      setNewTime('09:00');
-    }
-    setSelectedAttendanceId(id);
-    setIsTimeDialogOpen(true);
+    
+    // Always fetch the latest data directly from the database before opening dialog
+    const fetchLatestTime = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('attendance_records')
+          .select('timestamp')
+          .eq('id', id)
+          .single();
+          
+        if (error) throw error;
+        
+        if (data && data.timestamp) {
+          const latestTime = new Date(data.timestamp);
+          setNewTime(format(latestTime, 'HH:mm'));
+        } else if (face && face.last_attendance && face.last_attendance !== 'Never') {
+          const lastAttendanceDate = new Date(face.last_attendance);
+          setNewTime(format(lastAttendanceDate, 'HH:mm'));
+        } else {
+          setNewTime('09:00');
+        }
+      } catch (err) {
+        console.error('Error fetching latest time:', err);
+        // Fallback to using data from the face object
+        if (face && face.last_attendance && face.last_attendance !== 'Never') {
+          const lastAttendanceDate = new Date(face.last_attendance);
+          setNewTime(format(lastAttendanceDate, 'HH:mm'));
+        } else {
+          setNewTime('09:00');
+        }
+      }
+      
+      setSelectedAttendanceId(id);
+      setIsTimeDialogOpen(true);
+    };
+    
+    fetchLatestTime();
   };
 
   if (isLoading) {
