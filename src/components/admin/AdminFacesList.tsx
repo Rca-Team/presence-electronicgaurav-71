@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -48,7 +47,6 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
   const [newTime, setNewTime] = useState('');
   const [isTimeDialogOpen, setIsTimeDialogOpen] = useState(false);
 
-  // Filter faces based on search term
   const filteredFaces = faces.filter(face => 
     face.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     face.employee_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -58,7 +56,6 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
   useEffect(() => {
     fetchRegisteredFaces();
 
-    // Set up real-time subscriptions
     const attendanceChannel = supabase
       .channel('attendance-changes')
       .on('postgres_changes', 
@@ -74,7 +71,6 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
       )
       .subscribe();
 
-    // Clean up subscription on unmount
     return () => {
       supabase.removeChannel(attendanceChannel);
     };
@@ -83,7 +79,6 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
   const fetchRegisteredFaces = async () => {
     try {
       setIsLoading(true);
-      // Fetch registered faces (attendance records with registration=true)
       const { data: registrationRecords, error } = await supabase
         .from('attendance_records')
         .select('*')
@@ -110,7 +105,6 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
 
         setFaces(processedFaces);
 
-        // Fetch attendance counts for each face
         for (const face of processedFaces) {
           fetchAttendanceCount(face.employee_id);
         }
@@ -129,7 +123,6 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
 
   const fetchAttendanceCount = async (employeeId: string) => {
     try {
-      // Count attendance records with status 'present' for this employee
       const { data, error } = await supabase
         .from('attendance_records')
         .select('id')
@@ -143,7 +136,6 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
         [employeeId]: data?.length || 0
       }));
 
-      // Update the faces array with the new attendance count
       setFaces(prev => prev.map(face => {
         if (face.employee_id === employeeId) {
           return {
@@ -175,10 +167,8 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
         variant: "default"
       });
       
-      // Refresh the list
       fetchRegisteredFaces();
       
-      // If this was the selected face, clear the selection
       if (id === selectedFaceId) {
         setSelectedFaceId(null);
       }
@@ -215,17 +205,13 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
         throw new Error('Record not found');
       }
 
-      // Get current date from timestamp
       const currentDate = new Date(record.timestamp || new Date());
       
-      // Parse the time string (HH:MM) and set it on the current date
       const [hours, minutes] = newTime.split(':').map(Number);
       currentDate.setHours(hours, minutes);
       
-      // Check if time is late (after 9:00 AM)
       const isLate = hours > 9 || (hours === 9 && minutes > 0);
       
-      // Update the attendance record with new timestamp and status
       const { error: updateError } = await supabase
         .from('attendance_records')
         .update({ 
@@ -236,17 +222,6 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
 
       if (updateError) throw updateError;
 
-      // Update the faces array with the new timestamp
-      setFaces(prev => prev.map(face => {
-        if (face.id === attendanceId) {
-          return {
-            ...face,
-            last_attendance: currentDate.toISOString()
-          };
-        }
-        return face;
-      }));
-
       toast({
         title: "Success",
         description: `Attendance time adjusted${isLate ? ' and marked as late' : ''}`,
@@ -254,8 +229,8 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
       });
 
       setIsTimeDialogOpen(false);
-      // Refresh the list to get updated data
-      fetchRegisteredFaces();
+      
+      await fetchRegisteredFaces();
     } catch (error) {
       console.error('Error adjusting time:', error);
       toast({
@@ -267,10 +242,6 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
   };
 
   const openTimeDialog = (id: string) => {
-    // Find the current face record to get the latest timestamp
-    const face = faces.find(face => face.id === id);
-    
-    // Always fetch the latest data directly from the database before opening dialog
     const fetchLatestTime = async () => {
       try {
         const { data, error } = await supabase
@@ -284,25 +255,18 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
         if (data && data.timestamp) {
           const latestTime = new Date(data.timestamp);
           setNewTime(format(latestTime, 'HH:mm'));
-        } else if (face && face.last_attendance && face.last_attendance !== 'Never') {
-          const lastAttendanceDate = new Date(face.last_attendance);
-          setNewTime(format(lastAttendanceDate, 'HH:mm'));
+          console.log('Fetched latest time:', format(latestTime, 'HH:mm'));
         } else {
           setNewTime('09:00');
+          console.log('No timestamp found, using default 09:00');
         }
       } catch (err) {
         console.error('Error fetching latest time:', err);
-        // Fallback to using data from the face object
-        if (face && face.last_attendance && face.last_attendance !== 'Never') {
-          const lastAttendanceDate = new Date(face.last_attendance);
-          setNewTime(format(lastAttendanceDate, 'HH:mm'));
-        } else {
-          setNewTime('09:00');
-        }
+        setNewTime('09:00');
+      } finally {
+        setSelectedAttendanceId(id);
+        setIsTimeDialogOpen(true);
       }
-      
-      setSelectedAttendanceId(id);
-      setIsTimeDialogOpen(true);
     };
     
     fetchLatestTime();
@@ -518,7 +482,15 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
         </div>
       )}
 
-      <Dialog open={isTimeDialogOpen} onOpenChange={setIsTimeDialogOpen}>
+      <Dialog 
+        open={isTimeDialogOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsTimeDialogOpen(false);
+            setSelectedAttendanceId(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Adjust Attendance Time</DialogTitle>
