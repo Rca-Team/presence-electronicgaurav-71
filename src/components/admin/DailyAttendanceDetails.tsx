@@ -45,6 +45,7 @@ const DailyAttendanceDetails: React.FC<DailyAttendanceDetailsProps> = ({
   console.log("Is date in lateAttendanceDays:", isDateInArray(selectedDate, lateAttendanceDays));
   console.log("Is date in absentDays:", isDateInArray(selectedDate, absentDays));
   console.log("Attendance days count:", attendanceDays.length);
+  console.log("Attendance days:", attendanceDays);
   console.log("Late attendance days count:", lateAttendanceDays.length);
   console.log("Absent days count:", absentDays.length);
 

@@ -17,6 +17,7 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
   const [lateAttendanceDays, setLateAttendanceDays] = useState<Date[]>([]);
   const [absentDays, setAbsentDays] = useState<Date[]>([]);
   const [selectedFace, setSelectedFace] = useState<FaceInfo | null>(null);
+  // Set selected date to the current date for demo (March 8, 2025)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date(2025, 2, 8));
   const [loading, setLoading] = useState(false);
   const [dailyAttendance, setDailyAttendance] = useState<{
@@ -131,10 +132,13 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
   // Calculate absent days
   useEffect(() => {
     if (workingDays.length > 0 && (attendanceDays.length > 0 || lateAttendanceDays.length > 0)) {
+      const today = new Date(2025, 2, 8); // Set to current date in demo (March 8, 2025)
+      
       const absent = workingDays.filter(workDay => {
-        const today = new Date(2025, 2, 8);
+        // Only consider days up to today
         if (workDay > today) return false;
         
+        // A day is absent if it's not in attendanceDays and not in lateAttendanceDays
         return !isDateInArray(workDay, attendanceDays) && !isDateInArray(workDay, lateAttendanceDays);
       });
       
