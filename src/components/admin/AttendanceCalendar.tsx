@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { UserCheck, Clock } from 'lucide-react';
+import { UserCheck, Clock, X } from 'lucide-react';
 import { Json } from '@/integrations/supabase/types';
 
 interface AttendanceCalendarProps {
@@ -25,6 +25,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
   const { toast } = useToast();
   const [attendanceDays, setAttendanceDays] = useState<Date[]>([]);
   const [lateAttendanceDays, setLateAttendanceDays] = useState<Date[]>([]);
+  const [absentDays, setAbsentDays] = useState<Date[]>([]);
   const [selectedFace, setSelectedFace] = useState<FaceInfo | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date(2025, 2, 8)); // March 8, 2025
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     timestamp: string;
     status: string;
   }[]>([]);
+  const [workingDays, setWorkingDays] = useState<Date[]>([]);
 
   const isDateInArray = (date: Date, dateArray: Date[]): boolean => {
     return dateArray.some(d => 
@@ -48,6 +50,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     if (selectedFaceId) {
       fetchSelectedFace(selectedFaceId);
       fetchAttendanceRecords(selectedFaceId);
+      generateWorkingDays();
 
       // Set up real-time subscription for any attendance changes
       attendanceChannel = supabase
@@ -74,6 +77,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       setSelectedFace(null);
       setAttendanceDays([]);
       setLateAttendanceDays([]);
+      setAbsentDays([]);
     }
 
     return () => {
@@ -91,6 +95,45 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       setDailyAttendance([]);
     }
   }, [selectedFaceId, selectedDate]);
+
+  // Generate working days (for the current month)
+  const generateWorkingDays = () => {
+    const currentYear = 2025;
+    const currentMonth = 2; // March (0-based)
+    
+    // Get the number of days in the current month
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    
+    // Generate dates for all weekdays (Monday-Friday) in the current month
+    const days: Date[] = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(currentYear, currentMonth, day);
+      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      
+      // Add Monday through Friday (1-5)
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        days.push(date);
+      }
+    }
+    
+    setWorkingDays(days);
+  };
+
+  // Calculate absent days based on working days minus present/late days
+  useEffect(() => {
+    if (workingDays.length > 0 && (attendanceDays.length > 0 || lateAttendanceDays.length > 0)) {
+      // Find days in workingDays that are not in attendanceDays or lateAttendanceDays
+      const absent = workingDays.filter(workDay => {
+        // Filter out future dates (after today - March 8, 2025)
+        const today = new Date(2025, 2, 8);
+        if (workDay > today) return false;
+        
+        return !isDateInArray(workDay, attendanceDays) && !isDateInArray(workDay, lateAttendanceDays);
+      });
+      
+      setAbsentDays(absent);
+    }
+  }, [workingDays, attendanceDays, lateAttendanceDays]);
 
   const fetchSelectedFace = async (faceId: string) => {
     try {
@@ -301,6 +344,9 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       return "bg-accent text-accent-foreground hover:bg-accent/80";
     }
     
+    if (isDateInArray(date, absentDays)) {
+      return "bg-red-500 text-white hover:bg-red-600";
+    }
     if (isDateInArray(date, lateAttendanceDays)) {
       return "bg-amber-500 text-white hover:bg-amber-600";
     }
@@ -308,6 +354,17 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       return "bg-green-500 text-white hover:bg-green-600";
     }
     return "";
+  };
+
+  // Format time to 12-hour format with AM/PM
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return format(date, 'h:mm a');
+  };
+
+  // Format date to show day of week and date
+  const formatDateWithDay = (date: Date) => {
+    return format(date, 'EEEE, MMMM d, yyyy');
   };
 
   return (
@@ -321,7 +378,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col items-center">
-                  <div className="mb-4 flex space-x-4">
+                  <div className="mb-4 flex flex-wrap gap-4">
                     <div className="flex items-center">
                       <div className="h-3 w-3 rounded-full bg-green-500 mr-2"></div>
                       <span className="text-sm">Present</span>
@@ -329,6 +386,10 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                     <div className="flex items-center">
                       <div className="h-3 w-3 rounded-full bg-amber-500 mr-2"></div>
                       <span className="text-sm">Late</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="h-3 w-3 rounded-full bg-red-500 mr-2"></div>
+                      <span className="text-sm">Absent</span>
                     </div>
                     <div className="flex items-center">
                       <div className="h-3 w-3 rounded-full bg-accent mr-2"></div>
@@ -349,6 +410,10 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                         backgroundColor: "rgb(245, 158, 11)", 
                         color: "white"
                       },
+                      absent: {
+                        backgroundColor: "rgb(239, 68, 68)",
+                        color: "white"
+                      },
                       today: {
                         backgroundColor: "hsl(var(--accent))",
                         color: "hsl(var(--accent-foreground))"
@@ -357,6 +422,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                     modifiers={{
                       present: attendanceDays,
                       late: lateAttendanceDays,
+                      absent: absentDays,
                       today: [new Date(2025, 2, 8)] // March 8, 2025
                     }}
                     defaultMonth={new Date(2025, 2, 1)} // Default to March 2025
@@ -393,7 +459,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                   {selectedDate && (
                     <div className="border-t pt-4 mt-4">
                       <h3 className="font-medium mb-2">
-                        {format(selectedDate, 'MMMM d, yyyy')} Attendance
+                        {formatDateWithDay(selectedDate)}
                       </h3>
                       {dailyAttendance.length > 0 ? (
                         <div className="space-y-2">
@@ -406,7 +472,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                                   <UserCheck className="h-4 w-4 text-green-500 mr-2" />
                                 )}
                                 <span>
-                                  {format(new Date(record.timestamp), 'h:mm a')}
+                                  {formatTime(record.timestamp)}
                                 </span>
                               </div>
                               <Badge variant={record.status === 'late' ? "outline" : "default"}>
@@ -417,6 +483,11 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                         </div>
                       ) : isDateInArray(selectedDate, attendanceDays) || isDateInArray(selectedDate, lateAttendanceDays) ? (
                         <p className="text-sm text-muted-foreground">Loading attendance details...</p>
+                      ) : isDateInArray(selectedDate, absentDays) ? (
+                        <div className="flex items-center justify-center p-4 bg-red-50 rounded-md">
+                          <X className="h-5 w-5 text-red-500 mr-2" />
+                          <span className="text-red-500 font-medium">Absent</span>
+                        </div>
                       ) : (
                         <p className="text-sm text-muted-foreground">No attendance recorded for this date.</p>
                       )}
