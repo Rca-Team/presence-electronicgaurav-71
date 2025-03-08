@@ -49,6 +49,56 @@ export const generatePrintableReport = ({
   const absentCount = absentDays.length;
   const attendanceRate = ((presentCount + lateCount) / totalWorkDays * 100).toFixed(1);
 
+  // Create rows for attendance table
+  const tableRows = workingDays
+    .filter(date => {
+      const today = new Date(2025, 2, 8);
+      return date <= today;
+    })
+    .sort((a, b) => b.getTime() - a.getTime())
+    .map(date => {
+      const isPresent = isDateInArray(date, attendanceDays);
+      const isLate = isDateInArray(date, lateAttendanceDays);
+      const isAbsent = isDateInArray(date, absentDays);
+      
+      let attendanceTime = '';
+      if ((isPresent || isLate) && 
+          selectedDate &&
+          date.getDate() === selectedDate.getDate() && 
+          date.getMonth() === selectedDate.getMonth() && 
+          date.getFullYear() === selectedDate.getFullYear() && 
+          dailyAttendance.length > 0) {
+        const firstRecord = dailyAttendance[0];
+        const recordTime = new Date(firstRecord.timestamp);
+        attendanceTime = recordTime.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+      
+      let status = 'N/A';
+      let statusClass = '';
+      
+      if (isPresent) {
+        status = 'Present';
+        statusClass = 'status-present';
+      } else if (isLate) {
+        status = 'Late';
+        statusClass = 'status-late';
+      } else if (isAbsent) {
+        status = 'Absent';
+        statusClass = 'status-absent';
+      }
+      
+      return `
+        <tr>
+          <td>${formatDate(date)}</td>
+          <td><span class="status-badge ${statusClass}">${status}</span></td>
+          <td>${(isPresent || isLate) ? attendanceTime || 'N/A' : '-'}</td>
+        </tr>
+      `;
+    }).join('');
+
   printWindow.document.write(`
     <html>
       <head>
@@ -191,54 +241,7 @@ export const generatePrintableReport = ({
             </tr>
           </thead>
           <tbody>
-            ${workingDays
-              .filter(date => {
-                const today = new Date(2025, 2, 8);
-                return date <= today;
-              })
-              .sort((a, b) => b.getTime() - a.getTime())
-              .map(date => {
-                const isPresent = isDateInArray(date, attendanceDays);
-                const isLate = isDateInArray(date, lateAttendanceDays);
-                const isAbsent = isDateInArray(date, absentDays);
-                
-                let attendanceTime = '';
-                if ((isPresent || isLate) && 
-                    selectedDate &&
-                    date.getDate() === selectedDate.getDate() && 
-                    date.getMonth() === selectedDate.getMonth() && 
-                    date.getFullYear() === selectedDate.getFullYear() && 
-                    dailyAttendance.length > 0) {
-                  const firstRecord = dailyAttendance[0];
-                  const recordTime = new Date(firstRecord.timestamp);
-                  attendanceTime = recordTime.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  });
-                }
-                
-                let status = 'N/A';
-                let statusClass = '';
-                
-                if (isPresent) {
-                  status = 'Present';
-                  statusClass = 'status-present';
-                } else if (isLate) {
-                  status = 'Late';
-                  statusClass = 'status-late';
-                } else if (isAbsent) {
-                  status = 'Absent';
-                  statusClass = 'status-absent';
-                }
-                
-                return \`
-                  <tr>
-                    <td>\${formatDate(date)}</td>
-                    <td><span class="status-badge \${statusClass}">\${status}</span></td>
-                    <td>\${(isPresent || isLate) ? attendanceTime || 'N/A' : '-'}</td>
-                  </tr>
-                \`;
-              }).join('')}
+            ${tableRows}
           </tbody>
         </table>
         
