@@ -1,10 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Json } from '@/integrations/supabase/types';
+import { Button } from '@/components/ui/button';
+import { Printer } from 'lucide-react';
 import CalendarLegend from './CalendarLegend';
 import StudentInfoCard from './StudentInfoCard';
 import DailyAttendanceDetails from './DailyAttendanceDetails';
@@ -337,14 +338,272 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     }
   };
 
+  // Print attendance report
+  const handlePrintReport = () => {
+    if (!selectedFace) return;
+    
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: "Error",
+        description: "Unable to open print window. Please check your browser settings.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Format date for the report
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    };
+
+    // Count attendance statistics
+    const totalWorkDays = workingDays.filter(date => {
+      const today = new Date(2025, 2, 8); // March 8, 2025
+      return date <= today;
+    }).length;
+    
+    const presentCount = attendanceDays.length;
+    const lateCount = lateAttendanceDays.length;
+    const absentCount = absentDays.length;
+    const attendanceRate = ((presentCount + lateCount) / totalWorkDays * 100).toFixed(1);
+
+    // Generate HTML content for printing
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Attendance Report - ${selectedFace.name}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 800px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            h1, h2, h3 {
+              color: #2563eb;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 1px solid #ddd;
+              padding-bottom: 10px;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 15px;
+              margin-bottom: 30px;
+            }
+            .info-item {
+              margin-bottom: 10px;
+            }
+            .label {
+              font-weight: bold;
+              color: #666;
+            }
+            .summary {
+              background-color: #f9fafb;
+              padding: 15px;
+              border-radius: 5px;
+              margin-bottom: 30px;
+            }
+            .status-badge {
+              display: inline-block;
+              padding: 3px 8px;
+              border-radius: 12px;
+              font-size: 12px;
+              font-weight: bold;
+              color: white;
+              margin-left: 5px;
+            }
+            .status-present {
+              background-color: #10b981;
+            }
+            .status-late {
+              background-color: #f59e0b;
+            }
+            .status-absent {
+              background-color: #ef4444;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px 12px;
+              text-align: left;
+            }
+            th {
+              background-color: #f1f5f9;
+            }
+            @media print {
+              body {
+                font-size: 12pt;
+              }
+              button {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Attendance Report</h1>
+            <p>Generated on ${formatDate(new Date(2025, 2, 8))}</p>
+          </div>
+          
+          <h2>Student Information</h2>
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="label">Name:</div>
+              <div>${selectedFace.name}</div>
+            </div>
+            <div class="info-item">
+              <div class="label">ID:</div>
+              <div>${selectedFace.employee_id}</div>
+            </div>
+            <div class="info-item">
+              <div class="label">Department:</div>
+              <div>${selectedFace.department}</div>
+            </div>
+            <div class="info-item">
+              <div class="label">Position:</div>
+              <div>${selectedFace.position}</div>
+            </div>
+          </div>
+          
+          <h2>Attendance Summary</h2>
+          <div class="summary">
+            <div class="info-item">
+              <div class="label">Total Working Days (to date):</div>
+              <div>${totalWorkDays}</div>
+            </div>
+            <div class="info-item">
+              <div class="label">Present Days:</div>
+              <div>${presentCount} <span class="status-badge status-present">Present</span></div>
+            </div>
+            <div class="info-item">
+              <div class="label">Late Days:</div>
+              <div>${lateCount} <span class="status-badge status-late">Late</span></div>
+            </div>
+            <div class="info-item">
+              <div class="label">Absent Days:</div>
+              <div>${absentCount} <span class="status-badge status-absent">Absent</span></div>
+            </div>
+            <div class="info-item">
+              <div class="label">Attendance Rate:</div>
+              <div>${attendanceRate}%</div>
+            </div>
+          </div>
+          
+          <h2>Attendance Details</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Time (if present)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${workingDays
+                .filter(date => {
+                  const today = new Date(2025, 2, 8); // March 8, 2025
+                  return date <= today;
+                })
+                .sort((a, b) => b.getTime() - a.getTime()) // Newest first
+                .map(date => {
+                  const isPresent = isDateInArray(date, attendanceDays);
+                  const isLate = isDateInArray(date, lateAttendanceDays);
+                  const isAbsent = isDateInArray(date, absentDays);
+                  
+                  // Find time from dailyAttendance if it's the selected date
+                  let attendanceTime = '';
+                  if ((isPresent || isLate) && 
+                      date.getDate() === selectedDate?.getDate() && 
+                      date.getMonth() === selectedDate?.getMonth() && 
+                      date.getFullYear() === selectedDate?.getFullYear() && 
+                      dailyAttendance.length > 0) {
+                    const firstRecord = dailyAttendance[0];
+                    const recordTime = new Date(firstRecord.timestamp);
+                    attendanceTime = recordTime.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+                  }
+                  
+                  let status = 'N/A';
+                  let statusClass = '';
+                  
+                  if (isPresent) {
+                    status = 'Present';
+                    statusClass = 'status-present';
+                  } else if (isLate) {
+                    status = 'Late';
+                    statusClass = 'status-late';
+                  } else if (isAbsent) {
+                    status = 'Absent';
+                    statusClass = 'status-absent';
+                  }
+                  
+                  return `
+                    <tr>
+                      <td>${formatDate(date)}</td>
+                      <td><span class="status-badge ${statusClass}">${status}</span></td>
+                      <td>${(isPresent || isLate) ? attendanceTime || 'N/A' : '-'}</td>
+                    </tr>
+                  `;
+                }).join('')}
+            </tbody>
+          </table>
+          
+          <div style="margin-top: 30px; text-align: center;">
+            <button onclick="window.print()">Print Report</button>
+          </div>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    
+    // Auto-print (optional)
+    // printWindow.print();
+    
+    toast({
+      title: "Report Generated",
+      description: "Attendance report has been generated in a new tab.",
+      variant: "default"
+    });
+  };
+
   return (
     <div className="space-y-6">
       {selectedFaceId ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row justify-between items-center">
                 <CardTitle>Attendance Calendar</CardTitle>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handlePrintReport}
+                  className="flex items-center gap-2"
+                  title="Print Attendance Report"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span className="hidden sm:inline">Print Report</span>
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col items-center">
