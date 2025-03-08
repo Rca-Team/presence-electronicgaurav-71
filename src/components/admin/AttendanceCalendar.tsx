@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, isToday, parseISO } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
   const [attendanceDays, setAttendanceDays] = useState<Date[]>([]);
   const [lateAttendanceDays, setLateAttendanceDays] = useState<Date[]>([]);
   const [selectedFace, setSelectedFace] = useState<FaceInfo | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date(2025, 2, 8)); // March 8, 2025
   const [loading, setLoading] = useState(false);
   const [dailyAttendance, setDailyAttendance] = useState<{
     id: string;
@@ -296,6 +296,11 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
 
   // Custom day class name function to apply styling to calendar days
   const getDayClassName = (date: Date) => {
+    // Check if the date is today (March 8, 2025)
+    if (date.getDate() === 8 && date.getMonth() === 2 && date.getFullYear() === 2025) {
+      return "bg-accent text-accent-foreground hover:bg-accent/80";
+    }
+    
     if (isDateInArray(date, lateAttendanceDays)) {
       return "bg-amber-500 text-white hover:bg-amber-600";
     }
@@ -325,6 +330,10 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                       <div className="h-3 w-3 rounded-full bg-amber-500 mr-2"></div>
                       <span className="text-sm">Late</span>
                     </div>
+                    <div className="flex items-center">
+                      <div className="h-3 w-3 rounded-full bg-accent mr-2"></div>
+                      <span className="text-sm">Today (March 8)</span>
+                    </div>
                   </div>
                   <Calendar
                     mode="single"
@@ -339,12 +348,18 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                       late: { 
                         backgroundColor: "rgb(245, 158, 11)", 
                         color: "white"
+                      },
+                      today: {
+                        backgroundColor: "hsl(var(--accent))",
+                        color: "hsl(var(--accent-foreground))"
                       }
                     }}
                     modifiers={{
                       present: attendanceDays,
-                      late: lateAttendanceDays
+                      late: lateAttendanceDays,
+                      today: [new Date(2025, 2, 8)] // March 8, 2025
                     }}
+                    defaultMonth={new Date(2025, 2, 1)} // Default to March 2025
                   />
                 </div>
               </CardContent>
