@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { format, isToday, parseISO } from 'date-fns';
-import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { UserCheck, Clock, X } from 'lucide-react';
 import { Json } from '@/integrations/supabase/types';
+import CalendarLegend from './CalendarLegend';
+import StudentInfoCard from './StudentInfoCard';
+import DailyAttendanceDetails from './DailyAttendanceDetails';
 
 interface AttendanceCalendarProps {
   selectedFaceId: string | null;
@@ -337,36 +337,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     }
   };
 
-  // Custom day class name function to apply styling to calendar days
-  const getDayClassName = (date: Date) => {
-    // Check if the date is today (March 8, 2025)
-    if (date.getDate() === 8 && date.getMonth() === 2 && date.getFullYear() === 2025) {
-      return "bg-accent text-accent-foreground hover:bg-accent/80";
-    }
-    
-    if (isDateInArray(date, absentDays)) {
-      return "bg-red-500 text-white hover:bg-red-600";
-    }
-    if (isDateInArray(date, lateAttendanceDays)) {
-      return "bg-amber-500 text-white hover:bg-amber-600";
-    }
-    if (isDateInArray(date, attendanceDays)) {
-      return "bg-green-500 text-white hover:bg-green-600";
-    }
-    return "";
-  };
-
-  // Format time to 12-hour format with AM/PM
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, 'h:mm a');
-  };
-
-  // Format date to show day of week and date
-  const formatDateWithDay = (date: Date) => {
-    return format(date, 'EEEE, MMMM d, yyyy');
-  };
-
   return (
     <div className="space-y-6">
       {selectedFaceId ? (
@@ -378,24 +348,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col items-center">
-                  <div className="mb-4 flex flex-wrap gap-4">
-                    <div className="flex items-center">
-                      <div className="h-3 w-3 rounded-full bg-green-500 mr-2"></div>
-                      <span className="text-sm">Present</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="h-3 w-3 rounded-full bg-amber-500 mr-2"></div>
-                      <span className="text-sm">Late</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="h-3 w-3 rounded-full bg-red-500 mr-2"></div>
-                      <span className="text-sm">Absent</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="h-3 w-3 rounded-full bg-accent mr-2"></div>
-                      <span className="text-sm">Today (March 8)</span>
-                    </div>
-                  </div>
+                  <CalendarLegend />
                   <Calendar
                     mode="single"
                     selected={selectedDate}
@@ -437,61 +390,21 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-sm text-muted-foreground">ID:</span>
-                      <p>{selectedFace?.employee_id || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm text-muted-foreground">Department:</span>
-                      <p>{selectedFace?.department || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm text-muted-foreground">Position:</span>
-                      <p>{selectedFace?.position || 'Student'}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm text-muted-foreground">Total Attendance:</span>
-                      <p>{attendanceDays.length + lateAttendanceDays.length} days</p>
-                    </div>
-                  </div>
-
+                  <StudentInfoCard 
+                    selectedFace={selectedFace} 
+                    attendanceDays={attendanceDays} 
+                    lateAttendanceDays={lateAttendanceDays} 
+                  />
+                  
                   {selectedDate && (
-                    <div className="border-t pt-4 mt-4">
-                      <h3 className="font-medium mb-2">
-                        {formatDateWithDay(selectedDate)}
-                      </h3>
-                      {dailyAttendance.length > 0 ? (
-                        <div className="space-y-2">
-                          {dailyAttendance.map((record) => (
-                            <div key={record.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
-                              <div className="flex items-center">
-                                {record.status === 'late' ? (
-                                  <Clock className="h-4 w-4 text-amber-500 mr-2" />
-                                ) : (
-                                  <UserCheck className="h-4 w-4 text-green-500 mr-2" />
-                                )}
-                                <span>
-                                  {formatTime(record.timestamp)}
-                                </span>
-                              </div>
-                              <Badge variant={record.status === 'late' ? "outline" : "default"}>
-                                {record.status === 'late' ? 'Late' : 'Present'}
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      ) : isDateInArray(selectedDate, attendanceDays) || isDateInArray(selectedDate, lateAttendanceDays) ? (
-                        <p className="text-sm text-muted-foreground">Loading attendance details...</p>
-                      ) : isDateInArray(selectedDate, absentDays) ? (
-                        <div className="flex items-center justify-center p-4 bg-red-50 rounded-md">
-                          <X className="h-5 w-5 text-red-500 mr-2" />
-                          <span className="text-red-500 font-medium">Absent</span>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No attendance recorded for this date.</p>
-                      )}
-                    </div>
+                    <DailyAttendanceDetails
+                      selectedDate={selectedDate}
+                      dailyAttendance={dailyAttendance}
+                      isDateInArray={isDateInArray}
+                      attendanceDays={attendanceDays}
+                      lateAttendanceDays={lateAttendanceDays}
+                      absentDays={absentDays}
+                    />
                   )}
                 </div>
               </CardContent>
