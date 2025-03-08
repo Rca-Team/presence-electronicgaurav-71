@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -26,11 +26,61 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
   }[]>([]);
   const [workingDays, setWorkingDays] = useState<Date[]>([]);
 
+  // Load attendance records
+  const loadAttendanceRecords = useCallback(async (faceId: string) => {
+    try {
+      setLoading(true);
+      console.log('Loading attendance records for face ID:', faceId);
+      await fetchAttendanceRecords(faceId, setAttendanceDays, setLateAttendanceDays);
+      console.log('Attendance records loaded successfully');
+    } catch (error) {
+      console.error('Error loading attendance records:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load attendance records",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  // Load daily attendance
+  const loadDailyAttendance = useCallback(async (faceId: string, date: Date) => {
+    try {
+      console.log('Loading daily attendance for date:', date);
+      await fetchDailyAttendance(faceId, date, setDailyAttendance);
+      console.log('Daily attendance loaded successfully');
+    } catch (error) {
+      console.error('Error loading daily attendance:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load daily attendance details",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
+
   // Subscribe to real-time updates
   useEffect(() => {
     let attendanceChannel: any = null;
 
     if (selectedFaceId) {
+      const fetchFaceDetails = async (faceId: string) => {
+        try {
+          const faceInfo = await fetchSelectedFace(faceId);
+          setSelectedFace(faceInfo);
+          console.log('Face details loaded:', faceInfo);
+        } catch (error) {
+          console.error('Error fetching face details:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load face details",
+            variant: "destructive"
+          });
+        }
+      };
+
       fetchFaceDetails(selectedFaceId);
       loadAttendanceRecords(selectedFaceId);
       setWorkingDays(generateWorkingDays(2025, 2));
@@ -67,7 +117,7 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
         console.log('Unsubscribed from attendance calendar updates');
       }
     };
-  }, [selectedFaceId]);
+  }, [selectedFaceId, loadAttendanceRecords, toast]);
 
   // Load daily attendance when selected date changes
   useEffect(() => {
@@ -76,7 +126,7 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
     } else {
       setDailyAttendance([]);
     }
-  }, [selectedFaceId, selectedDate]);
+  }, [selectedFaceId, selectedDate, loadDailyAttendance]);
 
   // Calculate absent days
   useEffect(() => {
@@ -89,54 +139,9 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
       });
       
       setAbsentDays(absent);
+      console.log('Absent days calculated:', absent.length);
     }
   }, [workingDays, attendanceDays, lateAttendanceDays]);
-
-  // Fetch face details
-  const fetchFaceDetails = async (faceId: string) => {
-    try {
-      const faceInfo = await fetchSelectedFace(faceId);
-      setSelectedFace(faceInfo);
-    } catch (error) {
-      console.error('Error fetching face details:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load face details",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Load attendance records
-  const loadAttendanceRecords = async (faceId: string) => {
-    try {
-      setLoading(true);
-      await fetchAttendanceRecords(faceId, setAttendanceDays, setLateAttendanceDays);
-    } catch (error) {
-      console.error('Error loading attendance records:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load attendance records",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load daily attendance
-  const loadDailyAttendance = async (faceId: string, date: Date) => {
-    try {
-      await fetchDailyAttendance(faceId, date, setDailyAttendance);
-    } catch (error) {
-      console.error('Error loading daily attendance:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load daily attendance details",
-        variant: "destructive"
-      });
-    }
-  };
 
   return {
     attendanceDays,

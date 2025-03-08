@@ -38,6 +38,16 @@ const DailyAttendanceDetails: React.FC<DailyAttendanceDetailsProps> = ({
 
   if (!selectedDate) return null;
 
+  // Debug logs to help identify issues
+  console.log("Selected date:", selectedDate);
+  console.log("Daily attendance:", dailyAttendance);
+  console.log("Is date in attendanceDays:", isDateInArray(selectedDate, attendanceDays));
+  console.log("Is date in lateAttendanceDays:", isDateInArray(selectedDate, lateAttendanceDays));
+  console.log("Is date in absentDays:", isDateInArray(selectedDate, absentDays));
+  console.log("Attendance days count:", attendanceDays.length);
+  console.log("Late attendance days count:", lateAttendanceDays.length);
+  console.log("Absent days count:", absentDays.length);
+
   return (
     <div className="border-t pt-4 mt-4">
       <h3 className="font-medium mb-2">
@@ -63,8 +73,16 @@ const DailyAttendanceDetails: React.FC<DailyAttendanceDetailsProps> = ({
             </div>
           ))}
         </div>
-      ) : isDateInArray(selectedDate, attendanceDays) || isDateInArray(selectedDate, lateAttendanceDays) ? (
-        <p className="text-sm text-muted-foreground">Loading attendance details...</p>
+      ) : isDateInArray(selectedDate, attendanceDays) ? (
+        <div className="flex items-center justify-center p-4 bg-green-50 rounded-md">
+          <UserCheck className="h-5 w-5 text-green-500 mr-2" />
+          <span className="text-green-500 font-medium">Present</span>
+        </div>
+      ) : isDateInArray(selectedDate, lateAttendanceDays) ? (
+        <div className="flex items-center justify-center p-4 bg-amber-50 rounded-md">
+          <Clock className="h-5 w-5 text-amber-500 mr-2" />
+          <span className="text-amber-500 font-medium">Late</span>
+        </div>
       ) : isDateInArray(selectedDate, absentDays) ? (
         <div className="flex items-center justify-center p-4 bg-red-50 rounded-md">
           <X className="h-5 w-5 text-red-500 mr-2" />
