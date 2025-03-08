@@ -14,6 +14,7 @@ import {
   storeUnrecognizedFace
 } from '@/services/face-recognition/RegistrationService';
 import { toast } from 'sonner';
+import { recordAttendanceToFirebase } from '@/services/firebase/attendanceService';
 
 export interface FaceRecognitionResult {
   recognized: boolean;
@@ -130,6 +131,15 @@ export const useFaceRecognition = () => {
             .catch(err => console.error('Failed to store unrecognized face, but continuing:', err));
           
           imageUrl = imageData;
+          
+          // Store unauthorized face in Firebase
+          await recordAttendanceToFirebase(
+            'unknown-' + new Date().getTime(),
+            'unauthorized',
+            0,
+            'Unknown Person',
+            imageUrl
+          ).catch(err => console.error('Failed to store unrecognized face in Firebase:', err));
         }
         
         const result: FaceRecognitionResult = {

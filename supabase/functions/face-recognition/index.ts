@@ -20,7 +20,7 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
     
-    const { operation, userId } = await req.json()
+    const { operation, userId, date } = await req.json()
     
     // Health check endpoint for model status
     if (operation === 'healthCheck') {
@@ -52,6 +52,28 @@ serve(async (req) => {
         JSON.stringify({
           count: attendanceData?.length || 0,
           userId: userId
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
+    }
+    
+    // Get attendance for a specific date (useful for Firebase integration)
+    if (operation === 'getAttendanceByDate' && date) {
+      const { data: attendanceData, error: attendanceError } = await supabaseClient
+        .from('attendance_records')
+        .select('id, user_id, status, timestamp, confidence_score, device_info')
+        .gte('timestamp', `${date}T00:00:00`)
+        .lte('timestamp', `${date}T23:59:59`);
+      
+      if (attendanceError) throw attendanceError;
+      
+      return new Response(
+        JSON.stringify({
+          records: attendanceData || [],
+          date: date
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -114,8 +136,6 @@ serve(async (req) => {
         }
       )
     }
-    
-    // Handler for future operations
     
     return new Response(
       JSON.stringify({ error: 'Unknown operation' }),

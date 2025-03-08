@@ -1,15 +1,16 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { 
   fetchSelectedFace, 
-  fetchAttendanceRecords, 
-  fetchDailyAttendance,
   generateWorkingDays,
   isDateInArray,
   FaceInfo
 } from '../utils/attendanceUtils';
+import {
+  getAllUserAttendance,
+  getUserAttendanceForDate
+} from '@/services/firebase/attendanceService';
 
 export const useAttendanceCalendar = (selectedFaceId: string | null) => {
   const { toast } = useToast();
@@ -27,45 +28,89 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
   }[]>([]);
   const [workingDays, setWorkingDays] = useState<Date[]>([]);
 
-  // Load attendance records
-  const loadAttendanceRecords = useCallback(async (faceId: string) => {
+  // Load attendance records from Firebase
+  const loadAttendanceRecords = useCallback((faceId: string) => {
     try {
       setLoading(true);
       console.log('Loading attendance records for face ID:', faceId);
-      await fetchAttendanceRecords(faceId, setAttendanceDays, setLateAttendanceDays);
-      console.log('Attendance records loaded successfully');
+      
+      // Unsubscribe reference
+      let unsubscribe: () => void;
+      
+      // Get all attendance for this user from Firebase
+      unsubscribe = getAllUserAttendance(
+        faceId, 
+        (presentDays, lateDays, absentDaysData) => {
+          console.log('Firebase attendance loaded - Present days:', presentDays.length);
+          console.log('Firebase attendance loaded - Late days:', lateDays.length);
+          setAttendanceDays(presentDays);
+          setLateAttendanceDays(lateDays);
+          setLoading(false);
+        }
+      );
+      
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
     } catch (error) {
-      console.error('Error loading attendance records:', error);
+      console.error('Error loading attendance records from Firebase:', error);
       toast({
         title: "Error",
         description: "Failed to load attendance records",
         variant: "destructive"
       });
-    } finally {
       setLoading(false);
+      return () => {};
     }
   }, [toast]);
 
-  // Load daily attendance
-  const loadDailyAttendance = useCallback(async (faceId: string, date: Date) => {
+  // Load daily attendance from Firebase
+  const loadDailyAttendance = useCallback((faceId: string, date: Date) => {
     try {
       console.log('Loading daily attendance for date:', date);
-      await fetchDailyAttendance(faceId, date, setDailyAttendance);
-      console.log('Daily attendance loaded successfully');
+      
+      const formattedDate = date.toISOString().split('T')[0];
+      
+      // Unsubscribe reference
+      let unsubscribe: () => void;
+      
+      // Get attendance for this user on this specific date
+      unsubscribe = getUserAttendanceForDate(
+        faceId, 
+        formattedDate,
+        (data) => {
+          if (data) {
+            console.log('Daily attendance data from Firebase:', data);
+            setDailyAttendance([{
+              id: faceId,
+              timestamp: data.timestamp,
+              status: data.status
+            }]);
+          } else {
+            console.log('No daily attendance found for this date');
+            setDailyAttendance([]);
+          }
+        }
+      );
+      
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
     } catch (error) {
-      console.error('Error loading daily attendance:', error);
+      console.error('Error loading daily attendance from Firebase:', error);
       toast({
         title: "Error",
         description: "Failed to load daily attendance details",
         variant: "destructive"
       });
+      return () => {};
     }
   }, [toast]);
 
-  // Subscribe to real-time updates
+  // Set up face details and attendance data
   useEffect(() => {
-    let attendanceChannel: any = null;
-
+    let unsubscribeAttendance: () => void = () => {};
+    
     if (selectedFaceId) {
       const fetchFaceDetails = async (faceId: string) => {
         try {
@@ -83,30 +128,10 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
       };
 
       fetchFaceDetails(selectedFaceId);
-      loadAttendanceRecords(selectedFaceId);
+      unsubscribeAttendance = loadAttendanceRecords(selectedFaceId);
       setWorkingDays(generateWorkingDays(2025, 2));
 
-      // Subscribe to ALL attendance_records changes
-      attendanceChannel = supabase
-        .channel(`attendance-calendar-${selectedFaceId}`)
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'attendance_records'
-          }, 
-          (payload) => {
-            console.log('Real-time update received for attendance calendar:', payload);
-            // Reload all attendance data when any attendance record changes
-            loadAttendanceRecords(selectedFaceId);
-            if (selectedDate) {
-              loadDailyAttendance(selectedFaceId, selectedDate);
-            }
-          }
-        )
-        .subscribe();
-
-      console.log('Subscribed to real-time updates for attendance calendar');
+      console.log('Set up Firebase listeners for attendance data');
     } else {
       setSelectedFace(null);
       setAttendanceDays([]);
@@ -115,20 +140,24 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
     }
 
     return () => {
-      if (attendanceChannel) {
-        supabase.removeChannel(attendanceChannel);
-        console.log('Unsubscribed from attendance calendar updates');
-      }
+      unsubscribeAttendance();
+      console.log('Cleaned up Firebase listeners');
     };
-  }, [selectedFaceId, loadAttendanceRecords, loadDailyAttendance, toast]);
+  }, [selectedFaceId, loadAttendanceRecords, toast]);
 
   // Load daily attendance when selected date changes
   useEffect(() => {
+    let unsubscribeDailyAttendance: () => void = () => {};
+    
     if (selectedFaceId && selectedDate) {
-      loadDailyAttendance(selectedFaceId, selectedDate);
+      unsubscribeDailyAttendance = loadDailyAttendance(selectedFaceId, selectedDate);
     } else {
       setDailyAttendance([]);
     }
+    
+    return () => {
+      unsubscribeDailyAttendance();
+    };
   }, [selectedFaceId, selectedDate, loadDailyAttendance]);
 
   // Calculate absent days
