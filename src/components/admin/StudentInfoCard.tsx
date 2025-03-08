@@ -1,13 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-interface FaceInfo {
-  name: string;
-  employee_id: string;
-  department: string;
-  position: string;
-}
+import { FaceInfo } from './utils/attendanceUtils';
 
 interface StudentInfoCardProps {
   selectedFace: FaceInfo | null;
