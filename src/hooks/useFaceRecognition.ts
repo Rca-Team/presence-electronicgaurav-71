@@ -80,19 +80,25 @@ export const useFaceRecognition = () => {
           : `${mediaElement.width || 'unknown width'} x ${mediaElement.height || 'unknown height'}`
       );
       
+      // Extended check for video element readiness
       if (mediaElement instanceof HTMLVideoElement) {
         console.log('Video state:', mediaElement.readyState, 'Video dimensions:', mediaElement.videoWidth, 'x', mediaElement.videoHeight);
         
+        // More robust video readiness check with multiple attempts
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        while ((mediaElement.readyState < 2 || mediaElement.videoWidth === 0) && attempts < maxAttempts) {
+          console.log(`Video not ready for processing, attempt ${attempts + 1}/${maxAttempts}`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Longer timeout between attempts
+          attempts++;
+        }
+        
         if (mediaElement.readyState < 2 || mediaElement.videoWidth === 0) {
-          console.log('Video not ready for processing, retrying...');
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          if (mediaElement.readyState < 2 || mediaElement.videoWidth === 0) {
-            setError('Video stream not ready. Please try again.');
-            setIsProcessing(false);
-            toast.error('Video stream not ready. Please try again.');
-            return null;
-          }
+          setError('Camera stream not ready. Please restart the camera and try again.');
+          setIsProcessing(false);
+          toast.error('Camera stream not ready. Please restart the camera and try again.');
+          return null;
         }
       }
       

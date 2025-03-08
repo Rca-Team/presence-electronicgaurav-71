@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -27,49 +28,122 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const retryTimeoutRef = useRef<number | null>(null);
+  const attemptCountRef = useRef(0);
+  const MAX_RETRY_ATTEMPTS = 3;
 
   useImperativeHandle(ref, () => localVideoRef.current!, []);
 
   const startCamera = async () => {
     try {
+      // Clear previous errors and set loading state
       setIsLoading(true);
       setError(null);
       
+      // Clear any existing timeout
+      if (retryTimeoutRef.current) {
+        window.clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+      
+      // Stop any existing stream
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
       
-      const timeoutId = setTimeout(() => {
-        setError('Camera access timeout. Please check your camera permissions.');
-        setIsLoading(false);
-      }, 10000);
+      // Set a timeout to detect if camera access takes too long
+      const timeoutId = window.setTimeout(() => {
+        if (attemptCountRef.current < MAX_RETRY_ATTEMPTS) {
+          attemptCountRef.current++;
+          console.log(`Camera access timeout, retry attempt ${attemptCountRef.current}`);
+          startCamera(); // Retry
+        } else {
+          setError('Camera access timeout. Please check your camera permissions and try again.');
+          setIsLoading(false);
+          setIsActive(false);
+          attemptCountRef.current = 0; // Reset for future attempts
+        }
+      }, 8000); // 8 seconds timeout
       
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
+      console.log(`Requesting camera access with facing mode: ${cameraFacing}, attempt ${attemptCountRef.current + 1}`);
+      
+      // Try with ideal constraints first
+      const constraints = {
         video: { 
           facingMode: cameraFacing,
           width: { ideal: 1280 },
           height: { ideal: 720 } 
         }
-      });
+      };
       
-      clearTimeout(timeoutId);
-      
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = mediaStream;
-        await new Promise<void>((resolve) => {
-          if (localVideoRef.current) {
-            localVideoRef.current.onloadedmetadata = () => {
+      // Request camera access with better error handling
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // Clear timeout as we've successfully gotten the stream
+        window.clearTimeout(timeoutId);
+        
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = mediaStream;
+          
+          // Wait for video to be ready
+          await new Promise<void>((resolve) => {
+            if (localVideoRef.current) {
+              localVideoRef.current.onloadedmetadata = () => {
+                resolve();
+              };
+            } else {
               resolve();
-            };
-          } else {
-            resolve();
+            }
+          });
+          
+          // Play the video - with error handling
+          try {
+            await localVideoRef.current.play();
+            console.log('Video playback started successfully');
+          } catch (playError) {
+            console.error('Error starting video playback:', playError);
+            throw new Error('Failed to start video playback');
           }
-        });
+        }
+        
+        setStream(mediaStream);
+        setIsLoading(false);
+        attemptCountRef.current = 0; // Reset attempt counter on success
+        console.log('Camera started successfully');
+      } catch (mediaError) {
+        // Clear timeout as we got an error
+        window.clearTimeout(timeoutId);
+        
+        console.error('Error accessing camera with ideal constraints:', mediaError);
+        
+        // If we failed with ideal constraints, try with minimal constraints
+        if (attemptCountRef.current < MAX_RETRY_ATTEMPTS) {
+          attemptCountRef.current++;
+          console.log(`Retrying with minimal constraints, attempt ${attemptCountRef.current}`);
+          
+          try {
+            const minimalStream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: cameraFacing }
+            });
+            
+            if (localVideoRef.current) {
+              localVideoRef.current.srcObject = minimalStream;
+              await localVideoRef.current.play();
+            }
+            
+            setStream(minimalStream);
+            setIsLoading(false);
+            attemptCountRef.current = 0; // Reset attempt counter on success
+            console.log('Camera started successfully with minimal constraints');
+          } catch (minimalError) {
+            console.error('Error accessing camera with minimal constraints:', minimalError);
+            throw minimalError; // Let the outer catch block handle this
+          }
+        } else {
+          throw mediaError; // Let the outer catch block handle this
+        }
       }
-      
-      setStream(mediaStream);
-      setIsLoading(false);
-      console.log('Camera started successfully');
     } catch (err) {
       console.error('Error accessing camera:', err);
       
@@ -107,6 +181,9 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      if (retryTimeoutRef.current) {
+        window.clearTimeout(retryTimeoutRef.current);
+      }
     };
   }, [isActive, cameraFacing]);
 
@@ -138,6 +215,8 @@ export const Webcam = forwardRef<HTMLVideoElement, WebcamProps>(({
   };
 
   const toggleCamera = () => {
+    // Reset attempt counter when manually toggling
+    attemptCountRef.current = 0;
     setIsActive(prev => !prev);
   };
 
