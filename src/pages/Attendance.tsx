@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { PageHeader } from '@/components/ui/page-header';
@@ -11,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import useFaceRecognition from '@/hooks/useFaceRecognition';
 import { loadModels } from '@/services/face-recognition/ModelService';
+import { Json } from '@/integrations/supabase/types';
 
 const Attendance = () => {
   const { toast } = useToast();
@@ -68,10 +68,13 @@ const Attendance = () => {
             let username = 'Unknown';
             
             // Try to get name from device_info first
-            if (record.device_info && typeof record.device_info === 'object') {
-              const deviceInfo = record.device_info;
-              if (deviceInfo.metadata && deviceInfo.metadata.name) {
-                username = deviceInfo.metadata.name;
+            if (record.device_info && typeof record.device_info === 'object' && !Array.isArray(record.device_info)) {
+              const deviceInfo = record.device_info as { [key: string]: Json };
+              if (deviceInfo.metadata && 
+                  typeof deviceInfo.metadata === 'object' && 
+                  !Array.isArray(deviceInfo.metadata) &&
+                  'name' in deviceInfo.metadata) {
+                username = deviceInfo.metadata.name as string;
               }
             }
             

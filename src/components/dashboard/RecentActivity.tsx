@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { Json } from '@/integrations/supabase/types';
 
 interface RecentActivityProps {
   isLoading: boolean;
@@ -38,10 +39,13 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ isLoading, activityData
             let name = 'Unknown';
             
             // Try to get name from device_info
-            if (record.device_info && typeof record.device_info === 'object') {
-              const deviceInfo = record.device_info;
-              if (deviceInfo.metadata && deviceInfo.metadata.name) {
-                name = deviceInfo.metadata.name;
+            if (record.device_info && typeof record.device_info === 'object' && !Array.isArray(record.device_info)) {
+              const deviceInfo = record.device_info as { [key: string]: Json };
+              if (deviceInfo.metadata && 
+                  typeof deviceInfo.metadata === 'object' && 
+                  !Array.isArray(deviceInfo.metadata) &&
+                  'name' in deviceInfo.metadata) {
+                name = deviceInfo.metadata.name as string;
               }
             }
             
