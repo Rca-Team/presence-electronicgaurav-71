@@ -7,16 +7,17 @@ import { recordAttendanceToFirebase } from '../firebase/attendanceService';
  */
 export const recognizeFace = async (faceDescriptor: Float32Array) => {
   try {
-    // First check if face is registered in our database
-    const { data: employees, error } = await supabase
-      .from('employees')
-      .select('*');
+    // First check if face is registered in our database by checking registration records
+    const { data: registrationRecords, error } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .contains('device_info', { registration: true });
       
     if (error) throw error;
     
-    // If no employees, cannot recognize anyone
-    if (!employees || employees.length === 0) {
-      console.log('No employees found in database');
+    // If no registration records, cannot recognize anyone
+    if (!registrationRecords || registrationRecords.length === 0) {
+      console.log('No registered faces found in database');
       return { recognized: false };
     }
     
@@ -24,21 +25,36 @@ export const recognizeFace = async (faceDescriptor: Float32Array) => {
     let closestMatch = null;
     let minDistance = Infinity;
     
-    for (const employee of employees) {
-      if (!employee.face_descriptor) continue;
+    for (const record of registrationRecords) {
+      // For each registration record, check if it has device_info with face_descriptor
+      const deviceInfo = record.device_info as any;
+      const metadata = deviceInfo?.metadata || {};
       
-      // Convert stored descriptor back to Float32Array
-      const storedDescriptor = new Float32Array(
-        Object.values(JSON.parse(employee.face_descriptor))
-      );
+      if (!metadata.face_descriptor) continue;
       
-      // Calculate Euclidean distance between descriptors
-      const distance = euclideanDistance(faceDescriptor, storedDescriptor);
-      
-      // Update closest match if this is better
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestMatch = employee;
+      try {
+        // Convert stored descriptor back to Float32Array
+        const storedDescriptor = new Float32Array(
+          Object.values(JSON.parse(metadata.face_descriptor))
+        );
+        
+        // Calculate Euclidean distance between descriptors
+        const distance = euclideanDistance(faceDescriptor, storedDescriptor);
+        
+        // Update closest match if this is better
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestMatch = {
+            id: metadata.employee_id || record.id,
+            name: metadata.name || 'Unknown',
+            department: metadata.department || 'Unknown',
+            position: metadata.position || 'Unknown',
+            firebase_image_url: metadata.firebase_image_url || null
+          };
+        }
+      } catch (parseError) {
+        console.error('Error parsing face descriptor:', parseError);
+        continue;
       }
     }
     
@@ -73,18 +89,36 @@ export const recordAttendance = async (
   const timestamp = new Date().toISOString();
   
   try {
+    // Get employee details from attendance_records
+    const { data: employeeData, error: employeeError } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .contains('device_info', { metadata: { employee_id: userId } })
+      .single();
+    
+    let employeeName = 'Unknown';
+    let imageUrl = null;
+    
+    if (!employeeError && employeeData) {
+      const deviceInfo = employeeData.device_info as any;
+      const metadata = deviceInfo?.metadata || {};
+      employeeName = metadata.name || 'Unknown';
+      imageUrl = metadata.firebase_image_url || null;
+    }
+    
     // First, record in Supabase
     const { data, error } = await supabase
       .from('attendance_records')
       .insert([
         {
-          user_id: userId,
+          user_id: null, // Using null to avoid foreign key constraints
           status,
           timestamp,
           confidence_score: confidenceScore,
           device_info: {
             metadata: {
               timestamp,
+              employee_id: userId,
               device: navigator.userAgent
             }
           }
@@ -93,22 +127,13 @@ export const recordAttendance = async (
       
     if (error) throw error;
     
-    // Get employee details for Firebase
-    const { data: employeeData, error: employeeError } = await supabase
-      .from('employees')
-      .select('name, firebase_image_url')
-      .eq('id', userId)
-      .single();
-      
-    if (employeeError) throw employeeError;
-    
     // Then, record in Firebase Realtime Database
     await recordAttendanceToFirebase(
       userId,
       status === 'present' ? 'present' : 'late', // Convert 'unauthorized' to 'late' for Firebase
       confidenceScore,
-      employeeData?.name || 'Unknown',
-      employeeData?.firebase_image_url
+      employeeName,
+      imageUrl
     );
     
     console.log('Attendance recorded successfully');
