@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UserCheck, Clock } from 'lucide-react';
+import { Json } from '@/integrations/supabase/types';
 
 interface AttendanceCalendarProps {
   selectedFaceId: string | null;
@@ -39,16 +40,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       d.getMonth() === date.getMonth() &&
       d.getDate() === date.getDate()
     );
-  };
-
-  const dayClassName = (date: Date) => {
-    if (isDateInArray(date, lateAttendanceDays)) {
-      return "bg-amber-500 text-white hover:bg-amber-600";
-    }
-    if (isDateInArray(date, attendanceDays)) {
-      return "bg-green-500 text-white hover:bg-green-600";
-    }
-    return "";
   };
 
   useEffect(() => {
@@ -136,28 +127,50 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         
         if (userData) {
           const deviceInfo = userData.device_info as any;
-          const metadata = deviceInfo?.metadata || {};
-          
-          setSelectedFace({
-            name: metadata.name || 'Unknown Student',
-            employee_id: metadata.employee_id || faceId,
-            department: metadata.department || 'N/A',
-            position: metadata.position || 'Student',
-          });
+          if (deviceInfo && typeof deviceInfo === 'object' && !Array.isArray(deviceInfo)) {
+            const metadata = deviceInfo.metadata && typeof deviceInfo.metadata === 'object' && !Array.isArray(deviceInfo.metadata) 
+              ? deviceInfo.metadata 
+              : {};
+            
+            setSelectedFace({
+              name: metadata.name || 'Unknown Student',
+              employee_id: metadata.employee_id || faceId,
+              department: metadata.department || 'N/A',
+              position: metadata.position || 'Student',
+            });
+          } else {
+            setSelectedFace({
+              name: 'Unknown Student',
+              employee_id: faceId,
+              department: 'N/A',
+              position: 'Student'
+            });
+          }
           return;
         }
       }
 
       if (data) {
         const deviceInfo = data.device_info as any;
-        const metadata = deviceInfo?.metadata || {};
-        
-        setSelectedFace({
-          name: metadata.name || 'Unknown Student',
-          employee_id: metadata.employee_id || data.user_id || faceId,
-          department: metadata.department || 'N/A',
-          position: metadata.position || 'Student',
-        });
+        if (deviceInfo && typeof deviceInfo === 'object' && !Array.isArray(deviceInfo)) {
+          const metadata = deviceInfo.metadata && typeof deviceInfo.metadata === 'object' && !Array.isArray(deviceInfo.metadata) 
+            ? deviceInfo.metadata 
+            : {};
+          
+          setSelectedFace({
+            name: metadata.name || 'Unknown Student',
+            employee_id: metadata.employee_id || data.user_id || faceId,
+            department: metadata.department || 'N/A',
+            position: metadata.position || 'Student',
+          });
+        } else {
+          setSelectedFace({
+            name: 'Unknown Student',
+            employee_id: data.user_id || faceId,
+            department: 'N/A',
+            position: 'Student'
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching face details:', error);
@@ -281,6 +294,17 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     }
   };
 
+  // Custom day class name function to apply styling to calendar days
+  const getDayClassName = (date: Date) => {
+    if (isDateInArray(date, lateAttendanceDays)) {
+      return "bg-amber-500 text-white hover:bg-amber-600";
+    }
+    if (isDateInArray(date, attendanceDays)) {
+      return "bg-green-500 text-white hover:bg-green-600";
+    }
+    return "";
+  };
+
   return (
     <div className="space-y-6">
       {selectedFaceId ? (
@@ -307,13 +331,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                     selected={selectedDate}
                     onSelect={setSelectedDate}
                     className="rounded-md border"
-                    modifiersClassNames={{
-                      selected: "bg-primary",
-                    }}
                     modifiersStyles={{
-                      selected: { 
-                        fontWeight: 'bold' 
-                      },
                       present: { 
                         backgroundColor: "rgb(34, 197, 94)", 
                         color: "white"
@@ -322,9 +340,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                         backgroundColor: "rgb(245, 158, 11)", 
                         color: "white"
                       }
-                    }}
-                    classNames={{
-                      day: "relative inline-flex items-center justify-center"
                     }}
                     modifiers={{
                       present: attendanceDays,
