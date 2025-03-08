@@ -86,6 +86,7 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
       loadAttendanceRecords(selectedFaceId);
       setWorkingDays(generateWorkingDays(2025, 2));
 
+      // Subscribe to ALL attendance_records changes
       attendanceChannel = supabase
         .channel(`attendance-calendar-${selectedFaceId}`)
         .on('postgres_changes', 
@@ -96,6 +97,7 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
           }, 
           (payload) => {
             console.log('Real-time update received for attendance calendar:', payload);
+            // Reload all attendance data when any attendance record changes
             loadAttendanceRecords(selectedFaceId);
             if (selectedDate) {
               loadDailyAttendance(selectedFaceId, selectedDate);
@@ -118,7 +120,7 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
         console.log('Unsubscribed from attendance calendar updates');
       }
     };
-  }, [selectedFaceId, loadAttendanceRecords, toast]);
+  }, [selectedFaceId, loadAttendanceRecords, loadDailyAttendance, toast]);
 
   // Load daily attendance when selected date changes
   useEffect(() => {

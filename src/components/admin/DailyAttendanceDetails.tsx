@@ -49,6 +49,22 @@ const DailyAttendanceDetails: React.FC<DailyAttendanceDetailsProps> = ({
   console.log("Late attendance days count:", lateAttendanceDays.length);
   console.log("Absent days count:", absentDays.length);
 
+  // Compare dates only by year, month, and day
+  const isSameDay = (date1: Date, date2: Date) => {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate();
+  };
+
+  // Check if selected date is present in any of the arrays using a more direct comparison
+  const isPresentDay = attendanceDays.some(date => isSameDay(date, selectedDate));
+  const isLateDay = lateAttendanceDays.some(date => isSameDay(date, selectedDate));
+  const isAbsentDay = absentDays.some(date => isSameDay(date, selectedDate));
+
+  console.log("More accurate checks - isPresentDay:", isPresentDay);
+  console.log("More accurate checks - isLateDay:", isLateDay);
+  console.log("More accurate checks - isAbsentDay:", isAbsentDay);
+
   return (
     <div className="border-t pt-4 mt-4">
       <h3 className="font-medium mb-2">
@@ -74,17 +90,17 @@ const DailyAttendanceDetails: React.FC<DailyAttendanceDetailsProps> = ({
             </div>
           ))}
         </div>
-      ) : isDateInArray(selectedDate, attendanceDays) ? (
+      ) : isPresentDay ? (
         <div className="flex items-center justify-center p-4 bg-green-50 rounded-md">
           <UserCheck className="h-5 w-5 text-green-500 mr-2" />
           <span className="text-green-500 font-medium">Present</span>
         </div>
-      ) : isDateInArray(selectedDate, lateAttendanceDays) ? (
+      ) : isLateDay ? (
         <div className="flex items-center justify-center p-4 bg-amber-50 rounded-md">
           <Clock className="h-5 w-5 text-amber-500 mr-2" />
           <span className="text-amber-500 font-medium">Late</span>
         </div>
-      ) : isDateInArray(selectedDate, absentDays) ? (
+      ) : isAbsentDay ? (
         <div className="flex items-center justify-center p-4 bg-red-50 rounded-md">
           <X className="h-5 w-5 text-red-500 mr-2" />
           <span className="text-red-500 font-medium">Absent</span>
