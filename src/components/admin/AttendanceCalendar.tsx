@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Json } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
-import { Printer } from 'lucide-react';
+import { Printer, Download } from 'lucide-react';
 import CalendarLegend from './CalendarLegend';
 import StudentInfoCard from './StudentInfoCard';
 import DailyAttendanceDetails from './DailyAttendanceDetails';
@@ -14,7 +14,6 @@ interface AttendanceCalendarProps {
   selectedFaceId: string | null;
 }
 
-// Define an interface for student/face information
 interface FaceInfo {
   name: string;
   employee_id: string;
@@ -28,7 +27,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
   const [lateAttendanceDays, setLateAttendanceDays] = useState<Date[]>([]);
   const [absentDays, setAbsentDays] = useState<Date[]>([]);
   const [selectedFace, setSelectedFace] = useState<FaceInfo | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date(2025, 2, 8)); // March 8, 2025
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date(2025, 2, 8));
   const [loading, setLoading] = useState(false);
   const [dailyAttendance, setDailyAttendance] = useState<{
     id: string;
@@ -53,7 +52,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       fetchAttendanceRecords(selectedFaceId);
       generateWorkingDays();
 
-      // Set up real-time subscription for any attendance changes
       attendanceChannel = supabase
         .channel(`attendance-calendar-${selectedFaceId}`)
         .on('postgres_changes', 
@@ -64,7 +62,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
           }, 
           (payload) => {
             console.log('Real-time update received for attendance calendar:', payload);
-            // Refresh data whenever there's a change to attendance records
             fetchAttendanceRecords(selectedFaceId);
             if (selectedDate) {
               fetchDailyAttendance(selectedFaceId, selectedDate);
@@ -97,21 +94,17 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     }
   }, [selectedFaceId, selectedDate]);
 
-  // Generate working days (for the current month)
   const generateWorkingDays = () => {
     const currentYear = 2025;
-    const currentMonth = 2; // March (0-based)
+    const currentMonth = 2;
     
-    // Get the number of days in the current month
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     
-    // Generate dates for all weekdays (Monday-Friday) in the current month
     const days: Date[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentYear, currentMonth, day);
-      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      const dayOfWeek = date.getDay();
       
-      // Add Monday through Friday (1-5)
       if (dayOfWeek >= 1 && dayOfWeek <= 5) {
         days.push(date);
       }
@@ -120,12 +113,9 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     setWorkingDays(days);
   };
 
-  // Calculate absent days based on working days minus present/late days
   useEffect(() => {
     if (workingDays.length > 0 && (attendanceDays.length > 0 || lateAttendanceDays.length > 0)) {
-      // Find days in workingDays that are not in attendanceDays or lateAttendanceDays
       const absent = workingDays.filter(workDay => {
-        // Filter out future dates (after today - March 8, 2025)
         const today = new Date(2025, 2, 8);
         if (workDay > today) return false;
         
@@ -138,8 +128,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
 
   const fetchSelectedFace = async (faceId: string) => {
     try {
-      // Instead of querying registered_faces which doesn't exist in the type definition,
-      // check the attendance_records for metadata about the face/user
       const { data, error } = await supabase
         .from('attendance_records')
         .select('device_info, user_id')
@@ -149,7 +137,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       if (error) {
         console.error('Error fetching face details from attendance_records:', error);
         
-        // Try checking by user_id as fallback
         const { data: userData, error: userError } = await supabase
           .from('attendance_records')
           .select('device_info')
@@ -159,7 +146,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         if (userError) {
           console.error('Error fetching face details by user_id:', userError);
           
-          // Set default face info if nothing is found
           setSelectedFace({
             name: 'Unknown Student',
             employee_id: faceId,
@@ -224,7 +210,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
         variant: "destructive"
       });
       
-      // Set default values in case of error
       setSelectedFace({
         name: 'Unknown Student',
         employee_id: faceId,
@@ -239,10 +224,8 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       setLoading(true);
       console.log('Fetching attendance records for face ID:', faceId);
       
-      // Try to get attendance records using the face ID in different places
       const query = supabase.from('attendance_records');
       
-      // Record might have faceId as its own id or as user_id or in device_info metadata
       const { data: recordsPresent, error: errorPresent } = await query
         .select('*')
         .eq('status', 'present')
@@ -310,7 +293,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
       
-      // Query by both id and user_id to catch all possible records
       const { data: records, error } = await supabase
         .from('attendance_records')
         .select('id, timestamp, status')
@@ -338,11 +320,9 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     }
   };
 
-  // Print attendance report
   const handlePrintReport = () => {
     if (!selectedFace) return;
     
-    // Create a new window for printing
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast({
@@ -353,7 +333,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       return;
     }
 
-    // Format date for the report
     const formatDate = (date: Date) => {
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -362,9 +341,8 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
       });
     };
 
-    // Count attendance statistics
     const totalWorkDays = workingDays.filter(date => {
-      const today = new Date(2025, 2, 8); // March 8, 2025
+      const today = new Date(2025, 2, 8);
       return date <= today;
     }).length;
     
@@ -373,7 +351,6 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     const absentCount = absentDays.length;
     const attendanceRate = ((presentCount + lateCount) / totalWorkDays * 100).toFixed(1);
 
-    // Generate HTML content for printing
     printWindow.document.write(`
       <html>
         <head>
@@ -518,16 +495,15 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
             <tbody>
               ${workingDays
                 .filter(date => {
-                  const today = new Date(2025, 2, 8); // March 8, 2025
+                  const today = new Date(2025, 2, 8);
                   return date <= today;
                 })
-                .sort((a, b) => b.getTime() - a.getTime()) // Newest first
+                .sort((a, b) => b.getTime() - a.getTime())
                 .map(date => {
                   const isPresent = isDateInArray(date, attendanceDays);
                   const isLate = isDateInArray(date, lateAttendanceDays);
                   const isAbsent = isDateInArray(date, absentDays);
                   
-                  // Find time from dailyAttendance if it's the selected date
                   let attendanceTime = '';
                   if ((isPresent || isLate) && 
                       date.getDate() === selectedDate?.getDate() && 
@@ -576,12 +552,76 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
     
     printWindow.document.close();
     
-    // Auto-print (optional)
-    // printWindow.print();
-    
     toast({
       title: "Report Generated",
       description: "Attendance report has been generated in a new tab.",
+      variant: "default"
+    });
+  };
+
+  const handleExportCSV = () => {
+    if (!selectedFace) return;
+    
+    let csvContent = "Date,Status,Time\n";
+    
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+    };
+
+    const sortedDays = [...workingDays]
+      .filter(date => {
+        const today = new Date(2025, 2, 8);
+        return date <= today;
+      })
+      .sort((a, b) => b.getTime() - a.getTime());
+    
+    sortedDays.forEach(date => {
+      const isPresent = isDateInArray(date, attendanceDays);
+      const isLate = isDateInArray(date, lateAttendanceDays);
+      const isAbsent = isDateInArray(date, absentDays);
+      
+      let status = 'N/A';
+      let timeInfo = '';
+      
+      if (isPresent) {
+        status = 'Present';
+      } else if (isLate) {
+        status = 'Late';
+      } else if (isAbsent) {
+        status = 'Absent';
+      }
+      
+      if ((isPresent || isLate) && 
+          date.getDate() === selectedDate?.getDate() && 
+          date.getMonth() === selectedDate?.getMonth() && 
+          date.getFullYear() === selectedDate?.getFullYear() && 
+          dailyAttendance.length > 0) {
+        const firstRecord = dailyAttendance[0];
+        const recordTime = new Date(firstRecord.timestamp);
+        timeInfo = recordTime.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+      
+      csvContent += `${formatDate(date)},${status},${(isPresent || isLate) ? timeInfo : '-'}\n`;
+    });
+    
+    const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${selectedFace.name.replace(/\s+/g, '_')}_attendance.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "CSV Exported",
+      description: "Attendance data has been exported to CSV.",
       variant: "default"
     });
   };
@@ -594,16 +634,28 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
             <Card>
               <CardHeader className="flex flex-row justify-between items-center">
                 <CardTitle>Attendance Calendar</CardTitle>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handlePrintReport}
-                  className="flex items-center gap-2"
-                  title="Print Attendance Report"
-                >
-                  <Printer className="h-4 w-4" />
-                  <span className="hidden sm:inline">Print Report</span>
-                </Button>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleExportCSV}
+                    className="flex items-center gap-2"
+                    title="Export Attendance to CSV"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">Export CSV</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handlePrintReport}
+                    className="flex items-center gap-2"
+                    title="Print Attendance Report"
+                  >
+                    <Printer className="h-4 w-4" />
+                    <span className="hidden sm:inline">Print Report</span>
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col items-center">
@@ -635,9 +687,9 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                       present: attendanceDays,
                       late: lateAttendanceDays,
                       absent: absentDays,
-                      today: [new Date(2025, 2, 8)] // March 8, 2025
+                      today: [new Date(2025, 2, 8)]
                     }}
-                    defaultMonth={new Date(2025, 2, 1)} // Default to March 2025
+                    defaultMonth={new Date(2025, 2, 1)}
                   />
                 </div>
               </CardContent>
