@@ -48,27 +48,45 @@ export async function loadModels() {
     try {
       const testResponse = await fetch('/models/tiny_face_detector_model-weights_manifest.json');
       if (!testResponse.ok) {
-        console.error(`Failed to access models directory: ${testResponse.status} ${testResponse.statusText}`);
-        console.error('Response:', await testResponse.text());
         throw new Error(`Failed to access models directory: ${testResponse.status} ${testResponse.statusText}`);
       }
-      console.log('Models directory access confirmed, manifest file found');
+      
+      // Log response for debugging
+      console.log('Models directory access confirmed. Response status:', testResponse.status);
+      
+      // Try to parse the manifest to verify it's valid JSON
+      try {
+        const manifestText = await testResponse.text();
+        console.log('Manifest content sample:', manifestText.substring(0, 100) + '...');
+        JSON.parse(manifestText); // This will throw if invalid JSON
+        console.log('Manifest JSON is valid');
+      } catch (jsonError) {
+        console.error('Invalid manifest JSON:', jsonError);
+        throw new Error('Model manifest is not valid JSON');
+      }
     } catch (error) {
       console.error('Models directory access error:', error);
-      throw new Error('Cannot access face recognition models directory. Please check if models are correctly deployed.');
+      throw new Error(`Cannot access face recognition models: ${error.message}`);
     }
     
-    // Load models sequentially with progress tracking
+    // Load models with proper error handling for each model
     for (const model of MODEL_PATHS) {
       console.log(`Loading ${model.name} model...`);
       try {
-        // Set the correct model URL format
+        // Log the model load path for debugging
+        console.log(`Loading from: /models for ${model.name}`);
         await model.net.load('/models');
         console.log(`${model.name} model loaded successfully`);
       } catch (modelError) {
         console.error(`Error loading ${model.name} model:`, modelError);
-        throw modelError;
+        throw new Error(`Failed to load ${model.name}: ${modelError.message}`);
       }
+    }
+    
+    // Verify models are loaded
+    const allLoaded = MODEL_PATHS.every(model => model.net.isLoaded);
+    if (!allLoaded) {
+      throw new Error('Some models reported as not loaded after loading process');
     }
     
     modelsLoaded = true;
