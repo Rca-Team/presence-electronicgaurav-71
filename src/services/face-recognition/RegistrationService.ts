@@ -27,8 +27,8 @@ export const registerFace = async (
     // Upload face image to storage
     const imageUrl = await uploadFaceImage(imageBlob);
     
-    // Prepare metadata
-    const metadata: RegistrationMetadata = {
+    // Prepare metadata as a plain object that conforms to Json type
+    const metadata: Record<string, any> = {
       name,
       employee_id,
       department,
@@ -41,8 +41,8 @@ export const registerFace = async (
       metadata.faceDescriptor = descriptorToString(faceDescriptor);
     }
     
-    // Get device info
-    const deviceInfo = {
+    // Create device info as a plain object that conforms to Json type
+    const deviceInfo: Record<string, any> = {
       type: 'webcam',
       registration: true,
       metadata: metadata,
@@ -99,8 +99,8 @@ export const storeUnrecognizedFace = async (imageData: string): Promise<void> =>
     // Upload the image
     const imageUrl = await uploadFaceImage(blob);
     
-    // Create a device info object with the current timestamp
-    const deviceInfo = {
+    // Create a device info object with the current timestamp as a plain object
+    const deviceInfo: Record<string, any> = {
       type: 'webcam',
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString(),
