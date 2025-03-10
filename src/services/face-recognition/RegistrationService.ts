@@ -4,6 +4,16 @@ import { uploadImage } from './StorageService';
 import { v4 as uuidv4 } from 'uuid';
 import { descriptorToString } from './ModelService';
 
+// Define an interface for the metadata to ensure type safety
+interface RegistrationMetadata {
+  name: string;
+  employee_id: string;
+  department: string;
+  position: string;
+  firebase_image_url: string;
+  faceDescriptor?: string; // Make this optional since it's added conditionally
+}
+
 export const registerFace = async (
   imageBlob: Blob,
   name: string,
@@ -27,7 +37,7 @@ export const registerFace = async (
         department,
         position,
         firebase_image_url: imageUrl
-      },
+      } as RegistrationMetadata, // Type assertion here
       timestamp: new Date().toISOString()
     };
 
