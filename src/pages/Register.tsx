@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import PageLayout from '@/components/layouts/PageLayout';
@@ -108,7 +109,7 @@ const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!faceDescriptor || !faceCaptured) {
+    if (!faceDescriptor || !faceCaptured || !faceImage) {
       toast({
         title: "Missing face image",
         description: "Please capture your face before submitting",
@@ -127,17 +128,22 @@ const Register = () => {
       
       console.log('Using UUID for registration:', userId);
       
-      // Register face with our service - SKIP the profiles creation
-      const success = await registerFace(
-        faceImage ? await (await fetch(faceImage)).blob() : new Blob(),
+      // Convert the base64 image to a blob
+      const response = await fetch(faceImage);
+      const imageBlob = await response.blob();
+      
+      // Register face with our service
+      const registrationData = await registerFace(
+        imageBlob,
         formData.name,
         formData.employeeId,
         formData.department,
         formData.position || '',
-        userId
+        userId,
+        faceDescriptor // Pass the face descriptor to the registration function
       );
       
-      if (success) {
+      if (registrationData) {
         toast({
           title: "Registration Successful",
           description: "Your face has been registered for attendance",

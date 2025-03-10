@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { uploadImage } from './StorageService';
 import { v4 as uuidv4 } from 'uuid';
+import { descriptorToString } from './ModelService';
 
 export const registerFace = async (
   imageBlob: Blob,
@@ -9,22 +10,40 @@ export const registerFace = async (
   employee_id: string,
   department: string,
   position: string,
-  userId: string | undefined
+  userId: string | undefined,
+  faceDescriptor?: Float32Array
 ): Promise<any> => {
   try {
+    // Upload face image to storage
     const imageUrl = await uploadFaceImage(imageBlob);
+    
+    // Get device info with metadata
+    const deviceInfo = {
+      type: 'webcam',
+      registration: true,
+      metadata: {
+        name,
+        employee_id,
+        department,
+        position,
+        firebase_image_url: imageUrl
+      },
+      timestamp: new Date().toISOString()
+    };
 
-    // Get device info
-    const deviceInfo = await getDeviceInfo(name, employee_id, department, position);
+    // If we have a face descriptor, store it as well
+    if (faceDescriptor) {
+      deviceInfo.metadata.faceDescriptor = descriptorToString(faceDescriptor);
+    }
 
-    // Insert attendance record
-    const { data: attendanceRecord, error: attendanceError } = await supabase
+    // Insert registration record
+    const { data: recordData, error: recordError } = await supabase
       .from('attendance_records')
       .insert([
         {
           user_id: userId,
           timestamp: new Date().toISOString(),
-          status: 'present',
+          status: 'registered',
           device_info: deviceInfo,
           image_url: imageUrl,
         },
@@ -32,32 +51,15 @@ export const registerFace = async (
       .select()
       .single();
 
-    if (attendanceError) {
-      throw new Error(`Error inserting attendance record: ${attendanceError.message}`);
+    if (recordError) {
+      throw new Error(`Error inserting attendance record: ${recordError.message}`);
     }
 
-    return attendanceRecord;
+    return recordData;
   } catch (error: any) {
     console.error('Face registration failed:', error);
     throw error;
   }
-};
-
-const getDeviceInfo = async (
-  name: string,
-  employee_id: string,
-  department: string,
-  position: string
-): Promise<any> => {
-  return {
-    type: 'webcam',
-    metadata: {
-      name: name,
-      employee_id: employee_id,
-      department: department,
-      position: position,
-    },
-  };
 };
 
 export const uploadFaceImage = async (imageBlob: Blob): Promise<string> => {
@@ -65,7 +67,7 @@ export const uploadFaceImage = async (imageBlob: Blob): Promise<string> => {
     const file = new File([imageBlob], `face_${uuidv4()}.jpg`, { type: 'image/jpeg' });
     const filePath = `faces/${uuidv4()}.jpg`;
     
-    // Use our new uploadImage function
+    // Use our storage service upload function
     const publicUrl = await uploadImage(file, filePath);
     return publicUrl;
   } catch (error) {
