@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { descriptorToString } from './ModelService';
 
 // Define an interface for the metadata to ensure type safety
-interface RegistrationMetadata {
+export interface RegistrationMetadata {
   name: string;
   employee_id: string;
   department: string;
@@ -27,37 +27,38 @@ export const registerFace = async (
     // Upload face image to storage
     const imageUrl = await uploadFaceImage(imageBlob);
     
-    // Get device info with metadata
-    const deviceInfo = {
-      type: 'webcam',
-      registration: true,
-      metadata: {
-        name,
-        employee_id,
-        department,
-        position,
-        firebase_image_url: imageUrl
-      } as RegistrationMetadata, // Type assertion here
-      timestamp: new Date().toISOString()
+    // Prepare metadata
+    const metadata: RegistrationMetadata = {
+      name,
+      employee_id,
+      department,
+      position,
+      firebase_image_url: imageUrl
     };
 
     // If we have a face descriptor, store it as well
     if (faceDescriptor) {
-      deviceInfo.metadata.faceDescriptor = descriptorToString(faceDescriptor);
+      metadata.faceDescriptor = descriptorToString(faceDescriptor);
     }
+    
+    // Get device info
+    const deviceInfo = {
+      type: 'webcam',
+      registration: true,
+      metadata: metadata,
+      timestamp: new Date().toISOString()
+    };
 
     // Insert registration record
     const { data: recordData, error: recordError } = await supabase
       .from('attendance_records')
-      .insert([
-        {
-          user_id: userId,
-          timestamp: new Date().toISOString(),
-          status: 'registered',
-          device_info: deviceInfo,
-          image_url: imageUrl,
-        },
-      ])
+      .insert({
+        user_id: userId,
+        timestamp: new Date().toISOString(),
+        status: 'registered',
+        device_info: deviceInfo,
+        image_url: imageUrl,
+      })
       .select()
       .single();
 
@@ -109,14 +110,12 @@ export const storeUnrecognizedFace = async (imageData: string): Promise<void> =>
     // Insert a record with status "unauthorized"
     const { error } = await supabase
       .from('attendance_records')
-      .insert([
-        {
-          user_id: null, // No user associated
-          status: 'unauthorized',
-          device_info: deviceInfo,
-          image_url: imageUrl,
-        }
-      ]);
+      .insert({
+        user_id: null, // No user associated
+        status: 'unauthorized',
+        device_info: deviceInfo,
+        image_url: imageUrl,
+      });
     
     if (error) {
       console.error('Error storing unrecognized face:', error);
