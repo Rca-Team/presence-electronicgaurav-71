@@ -33,11 +33,21 @@ const Admin = () => {
           // Show notification and trigger refresh
           setAttendanceUpdated(true);
           
-          toast({
-            title: "Attendance Updated",
-            description: "New attendance data has been recorded and updated in real-time.",
-            variant: "default",
-          });
+          // If a record was deleted and it was the selected face, reset the selected face
+          if (payload.eventType === 'DELETE' && payload.old && payload.old.id === selectedFaceId) {
+            setSelectedFaceId(null);
+            toast({
+              title: "Face Deleted",
+              description: "The selected face has been deleted.",
+              variant: "default",
+            });
+          } else {
+            toast({
+              title: "Attendance Updated",
+              description: "New attendance data has been recorded and updated in real-time.",
+              variant: "default",
+            });
+          }
         }
       )
       .subscribe();
@@ -49,7 +59,7 @@ const Admin = () => {
       supabase.removeChannel(adminChannel);
       console.log('Unsubscribed from admin dashboard updates');
     };
-  }, [toast]);
+  }, [toast, selectedFaceId]);
 
   // Reset the update flag after a short delay
   useEffect(() => {

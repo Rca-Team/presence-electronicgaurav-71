@@ -45,9 +45,9 @@ const AttendanceCalendarView: React.FC<AttendanceCalendarViewProps> = ({
           }
         }}
         modifiers={{
-          present: attendanceDays,
-          late: lateAttendanceDays,
-          absent: absentDays,
+          present: attendanceDays || [],
+          late: lateAttendanceDays || [],
+          absent: absentDays || [],
           today: [new Date(2025, 2, 8)]
         }}
         defaultMonth={new Date(2025, 2, 1)}

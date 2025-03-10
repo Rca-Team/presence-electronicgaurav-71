@@ -104,6 +104,10 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
         });
 
         setFaces(processedFaces);
+        
+        if (selectedFaceId && !processedFaces.some(face => face.id === selectedFaceId)) {
+          setSelectedFaceId(null);
+        }
 
         for (const face of processedFaces) {
           fetchAttendanceCount(face.employee_id);
@@ -167,11 +171,11 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
         variant: "default"
       });
       
-      fetchRegisteredFaces();
-      
       if (id === selectedFaceId) {
         setSelectedFaceId(null);
       }
+      
+      await fetchRegisteredFaces();
     } catch (error) {
       console.error('Error deleting face:', error);
       toast({
