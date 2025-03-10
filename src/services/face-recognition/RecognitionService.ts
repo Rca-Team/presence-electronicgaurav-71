@@ -17,6 +17,21 @@ interface RecognitionResult {
   confidence?: number;
 }
 
+// Custom type for the device_info object structure we're working with
+interface DeviceInfo {
+  metadata?: {
+    name?: string;
+    employee_id?: string;
+    department?: string;
+    position?: string;
+    firebase_image_url?: string;
+    faceDescriptor?: string;
+  };
+  type?: string;
+  timestamp?: string;
+  registration?: boolean;
+}
+
 export async function recognizeFace(faceDescriptor: Float32Array): Promise<RecognitionResult> {
   try {
     console.log('Starting face recognition process');
@@ -48,14 +63,18 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<Recog
     // Compare the face descriptor against all registered faces
     for (const record of data) {
       try {
+        // Type check and safely access properties
+        const deviceInfo = record.device_info as DeviceInfo | null;
+        
         if (
-          record.device_info?.metadata?.faceDescriptor &&
-          typeof record.device_info.metadata.faceDescriptor === 'string'
+          deviceInfo?.metadata?.faceDescriptor &&
+          typeof deviceInfo.metadata.faceDescriptor === 'string'
         ) {
-          const registeredDescriptor = stringToDescriptor(record.device_info.metadata.faceDescriptor);
+          const registeredDescriptor = stringToDescriptor(deviceInfo.metadata.faceDescriptor);
           const distance = calculateDistance(faceDescriptor, registeredDescriptor);
           
-          console.log(`Face comparison: distance = ${distance.toFixed(4)} for ${record.device_info?.metadata?.name || 'unknown'}`);
+          const personName = deviceInfo.metadata.name || 'unknown';
+          console.log(`Face comparison: distance = ${distance.toFixed(4)} for ${personName}`);
           
           if (distance < bestDistance) {
             bestDistance = distance;
@@ -71,7 +90,8 @@ export async function recognizeFace(faceDescriptor: Float32Array): Promise<Recog
     if (bestMatch) {
       console.log(`Best match found with confidence: ${((1 - bestDistance) * 100).toFixed(2)}%`);
       
-      const employeeData = bestMatch.device_info?.metadata;
+      const deviceInfo = bestMatch.device_info as DeviceInfo | null;
+      const employeeData = deviceInfo?.metadata;
       
       if (!employeeData) {
         console.error('Employee metadata missing from best match');
