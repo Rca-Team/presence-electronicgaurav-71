@@ -24,8 +24,17 @@ export const registerFace = async (
   faceDescriptor?: Float32Array
 ): Promise<any> => {
   try {
+    console.log('Starting face registration process', {
+      name,
+      employee_id,
+      department,
+      position,
+      hasDescriptor: !!faceDescriptor
+    });
+    
     // Upload face image to storage
     const imageUrl = await uploadFaceImage(imageBlob);
+    console.log('Face image uploaded successfully:', imageUrl);
     
     // Prepare metadata as a plain object that conforms to Json type
     const metadata: Record<string, any> = {
@@ -49,6 +58,8 @@ export const registerFace = async (
       timestamp: new Date().toISOString()
     };
 
+    console.log('Inserting attendance record with metadata');
+    
     // Insert registration record
     const { data: recordData, error: recordError } = await supabase
       .from('attendance_records')
@@ -63,9 +74,11 @@ export const registerFace = async (
       .single();
 
     if (recordError) {
+      console.error('Error inserting attendance record:', recordError);
       throw new Error(`Error inserting attendance record: ${recordError.message}`);
     }
 
+    console.log('Registration completed successfully:', recordData);
     return recordData;
   } catch (error: any) {
     console.error('Face registration failed:', error);
@@ -75,11 +88,22 @@ export const registerFace = async (
 
 export const uploadFaceImage = async (imageBlob: Blob): Promise<string> => {
   try {
+    console.log('Starting face image upload, blob size:', imageBlob.size);
+    
+    // Validate the blob
+    if (!imageBlob || imageBlob.size === 0) {
+      throw new Error('Invalid image: The image blob is empty or invalid');
+    }
+    
+    // Create a unique filename
     const file = new File([imageBlob], `face_${uuidv4()}.jpg`, { type: 'image/jpeg' });
     const filePath = `faces/${uuidv4()}.jpg`;
     
+    console.log('Uploading image as:', filePath);
+    
     // Use our storage service upload function
     const publicUrl = await uploadImage(file, filePath);
+    console.log('Image uploaded successfully:', publicUrl);
     return publicUrl;
   } catch (error) {
     console.error('Error uploading face image:', error);
@@ -95,6 +119,11 @@ export const storeUnrecognizedFace = async (imageData: string): Promise<void> =>
     // Convert base64 image data to a Blob
     const response = await fetch(imageData);
     const blob = await response.blob();
+    
+    if (!blob || blob.size === 0) {
+      console.error('Failed to convert image data to blob');
+      return;
+    }
     
     // Upload the image
     const imageUrl = await uploadFaceImage(blob);
@@ -119,6 +148,8 @@ export const storeUnrecognizedFace = async (imageData: string): Promise<void> =>
     
     if (error) {
       console.error('Error storing unrecognized face:', error);
+    } else {
+      console.log('Unrecognized face stored successfully');
     }
   } catch (error) {
     console.error('Failed to store unrecognized face:', error);
