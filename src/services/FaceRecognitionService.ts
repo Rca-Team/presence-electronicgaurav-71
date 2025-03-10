@@ -9,7 +9,8 @@ export {
 
 export {
   registerFace,
-  storeUnrecognizedFace
+  storeUnrecognizedFace,
+  uploadFaceImage
 } from './face-recognition/RegistrationService';
 
 export {

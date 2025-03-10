@@ -88,6 +88,7 @@ export const storeUnrecognizedFace = async (imageData: string): Promise<void> =>
     
     // Create a device info object with the current timestamp
     const deviceInfo = {
+      type: 'webcam',
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString(),
       firebase_image_url: imageUrl,
@@ -100,7 +101,8 @@ export const storeUnrecognizedFace = async (imageData: string): Promise<void> =>
         {
           user_id: null, // No user associated
           status: 'unauthorized',
-          device_info: deviceInfo
+          device_info: deviceInfo,
+          image_url: imageUrl,
         }
       ]);
     
