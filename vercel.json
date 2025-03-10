@@ -38,8 +38,5 @@
       ]
     }
   ],
-  "regions": ["all"],
-  "dns": {
-    "ttl": 60
-  }
+  "regions": ["all"]
 }
