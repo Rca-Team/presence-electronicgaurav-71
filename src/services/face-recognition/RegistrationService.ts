@@ -1,148 +1,74 @@
-import { supabase, storage } from '@/integrations/supabase/client';
-import { descriptorToString } from './ModelService';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { supabase } from '@/integrations/supabase/client';
+import { uploadImage } from './StorageService';
+import { v4 as uuidv4 } from 'uuid';
 
-// Register a new face
-export async function registerFace(
-  employeeId: string, 
-  faceDescriptor: Float32Array,
-  employeeData: {
-    name: string;
-    employee_id: string;
-    department: string;
-    position?: string;
-    year?: string;
-    major?: string;
-    standing?: string;
-    starting_year?: string;
-    image_url?: string;
-  }
-): Promise<boolean> {
+export const registerFace = async (
+  imageBlob: Blob,
+  name: string,
+  employee_id: string,
+  department: string,
+  position: string,
+  userId: string | undefined
+): Promise<any> => {
   try {
-    console.log('Registering face with ID:', employeeId);
-    
-    // Upload image to Firebase Storage if provided
-    let firebaseImageUrl = null;
-    if (employeeData.image_url) {
-      try {
-        console.log('Attempting to upload image to Firebase');
-        // Store in face-auth folder
-        const imageRef = ref(storage, `face-auth/${employeeId}`);
-        // Remove data URL prefix if present
-        const base64Data = employeeData.image_url.includes('data:image') 
-          ? employeeData.image_url.split(',')[1] 
-          : employeeData.image_url;
-        
-        // Upload the image
-        await uploadString(imageRef, base64Data, 'base64');
-        
-        // Get the download URL
-        firebaseImageUrl = await getDownloadURL(imageRef);
-        console.log('Image uploaded to Firebase Storage:', firebaseImageUrl);
-      } catch (storageError) {
-        console.error('Error uploading image to Firebase:', storageError);
-        // Continue with registration even if image upload fails
-      }
-    }
-    
-    // Store employee metadata in a transaction record
-    const metadataRecord = {
-      employee_id: employeeData.employee_id,
-      department: employeeData.department,
-      position: employeeData.position,
-      year: employeeData.year,
-      major: employeeData.major,
-      standing: employeeData.standing,
-      starting_year: employeeData.starting_year,
-      firebase_image_url: firebaseImageUrl,
-      name: employeeData.name,
-      face_descriptor: descriptorToString(faceDescriptor) // Store face descriptor in metadata
-    };
-    
-    // Record attendance to mark registration
-    console.log('Storing registration in Supabase with status: present');
-    const { error: attendanceError } = await supabase
+    const imageUrl = await uploadFaceImage(imageBlob);
+
+    // Get device info
+    const deviceInfo = await getDeviceInfo(name, employee_id, department, position);
+
+    // Insert attendance record
+    const { data: attendanceRecord, error: attendanceError } = await supabase
       .from('attendance_records')
-      .insert({
-        user_id: null, // Use null to avoid foreign key constraints
-        status: 'present', // Use 'present' instead of 'registered' to match DB constraints
-        device_info: {
-          userAgent: navigator.userAgent,
+      .insert([
+        {
+          user_id: userId,
           timestamp: new Date().toISOString(),
-          registration: true,
-          metadata: metadataRecord,
-          employee_id: employeeId // Store the generated UUID here
+          status: 'present',
+          device_info: deviceInfo,
+          image_url: imageUrl,
         },
-        confidence_score: 1.0
-      });
-    
-    if (attendanceError) {
-      console.error('Error recording registration in Supabase:', attendanceError);
-      return false;
-    }
-    
-    console.log('Face registration completed successfully');
-    return true;
-  } catch (error) {
-    console.error('Error in registerFace function:', error);
-    return false;
-  }
-}
+      ])
+      .select()
+      .single();
 
-// Store unrecognized face - using face_profiles with null user
-export async function storeUnrecognizedFace(imageData: string): Promise<boolean> {
-  try {
-    console.log('Storing unrecognized face');
-    
-    const randomId = Math.random().toString(36).substring(2, 15);
-    
-    // Upload unrecognized face to Firebase
-    let firebaseImageUrl = null;
-    try {
-      console.log('Attempting to upload unrecognized face to Firebase');
-      // Store in face-auth/unrecognized folder
-      const imageRef = ref(storage, `face-auth/unrecognized/${randomId}`);
-      // Remove data URL prefix if present
-      const base64Data = imageData.includes('data:image') 
-        ? imageData.split(',')[1] 
-        : imageData;
-      
-      // Upload the image
-      await uploadString(imageRef, base64Data, 'base64');
-      
-      // Get the download URL
-      firebaseImageUrl = await getDownloadURL(imageRef);
-      console.log('Unrecognized face uploaded to Firebase:', firebaseImageUrl);
-    } catch (storageError) {
-      console.error('Error uploading unrecognized face to Firebase:', storageError);
-      // Continue even if image upload fails
+    if (attendanceError) {
+      throw new Error(`Error inserting attendance record: ${attendanceError.message}`);
     }
-    
-    const deviceInfo = {
-      userAgent: navigator.userAgent,
-      timestamp: new Date().toISOString(),
-      firebase_image_url: firebaseImageUrl
-    };
-    
-    console.log('Storing unrecognized face in Supabase with status: unauthorized');
-    // Use 'unauthorized' status which should be allowed by the DB constraints
-    const { error } = await supabase
-      .from('attendance_records')
-      .insert({
-        user_id: null,
-        status: 'unauthorized',
-        device_info: deviceInfo
-      });
-      
-    if (error) {
-      console.error('Error storing unrecognized face in Supabase:', error);
-      return false;
-    }
-    
-    console.log('Unrecognized face stored successfully');
-    return true;
-  } catch (error) {
-    console.error('Error storing unrecognized face:', error);
-    return false;
+
+    return attendanceRecord;
+  } catch (error: any) {
+    console.error('Face registration failed:', error);
+    throw error;
   }
-}
+};
+
+const getDeviceInfo = async (
+  name: string,
+  employee_id: string,
+  department: string,
+  position: string
+): Promise<any> => {
+  return {
+    type: 'webcam',
+    metadata: {
+      name: name,
+      employee_id: employee_id,
+      department: department,
+      position: position,
+    },
+  };
+};
+
+export const uploadFaceImage = async (imageBlob: Blob): Promise<string> => {
+  try {
+    const file = new File([imageBlob], `face_${uuidv4()}.jpg`, { type: 'image/jpeg' });
+    const filePath = `faces/${uuidv4()}.jpg`;
+    
+    // Use our new uploadImage function
+    const publicUrl = await uploadImage(file, filePath);
+    return publicUrl;
+  } catch (error) {
+    console.error('Error uploading face image:', error);
+    throw error;
+  }
+};
