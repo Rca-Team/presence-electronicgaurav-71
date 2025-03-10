@@ -32,6 +32,15 @@ export const registerFace = async (
       hasDescriptor: !!faceDescriptor
     });
     
+    if (!imageBlob || imageBlob.size === 0) {
+      console.error('Invalid image blob provided');
+      throw new Error('Invalid image: The image blob is empty or invalid');
+    }
+    
+    if (!faceDescriptor) {
+      console.warn('No face descriptor provided for registration. This may limit face recognition capabilities.');
+    }
+    
     // Upload face image to storage
     const imageUrl = await uploadFaceImage(imageBlob);
     console.log('Face image uploaded successfully:', imageUrl);
@@ -47,7 +56,9 @@ export const registerFace = async (
 
     // If we have a face descriptor, store it as well
     if (faceDescriptor) {
-      metadata.faceDescriptor = descriptorToString(faceDescriptor);
+      const descriptorString = descriptorToString(faceDescriptor);
+      console.log('Descriptor converted to string, length:', descriptorString.length);
+      metadata.faceDescriptor = descriptorString;
     }
     
     // Create device info as a plain object that conforms to Json type
@@ -64,7 +75,7 @@ export const registerFace = async (
     const { data: recordData, error: recordError } = await supabase
       .from('attendance_records')
       .insert({
-        user_id: userId,
+        user_id: userId || uuidv4(), // Ensure we always have a user ID
         timestamp: new Date().toISOString(),
         status: 'registered',
         device_info: deviceInfo,

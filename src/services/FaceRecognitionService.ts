@@ -6,7 +6,7 @@ export {
   descriptorToString,
   stringToDescriptor,
   areModelsLoaded,
-  forceReloadModels // Add the missing export
+  forceReloadModels // Ensure this is properly exported
 } from './face-recognition/ModelService';
 
 export {
