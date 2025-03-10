@@ -5,14 +5,14 @@ import {
   loadModels, 
   getFaceDescriptor,
   areModelsLoaded
-} from '@/services/face-recognition/ModelService';
+} from '@/services/FaceRecognitionService';
 import {
   recognizeFace,
   recordAttendance
-} from '@/services/face-recognition/RecognitionService';
+} from '@/services/FaceRecognitionService';
 import {
   storeUnrecognizedFace
-} from '@/services/face-recognition/RegistrationService';
+} from '@/services/FaceRecognitionService';
 import { toast } from 'sonner';
 
 export interface FaceRecognitionResult {

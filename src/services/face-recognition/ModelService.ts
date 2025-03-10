@@ -62,6 +62,7 @@ export async function loadModels() {
     for (const model of MODEL_PATHS) {
       console.log(`Loading ${model.name} model...`);
       try {
+        // Set the correct model URL format
         await model.net.load('/models');
         console.log(`${model.name} model loaded successfully`);
       } catch (modelError) {
@@ -122,7 +123,7 @@ export async function getFaceDescriptor(imageElement: HTMLImageElement | HTMLVid
     }
     
     // Wait for the image/video to be fully loaded - with proper type checking
-    if ((imageElement instanceof HTMLImageElement && imageElement.complete === false) || 
+    if ((imageElement instanceof HTMLImageElement && !imageElement.complete) || 
         (imageElement instanceof HTMLVideoElement && 
          (imageElement.readyState < 2 || imageElement.videoWidth === 0))) {
       
@@ -151,7 +152,7 @@ export async function getFaceDescriptor(imageElement: HTMLImageElement | HTMLVid
         : `Image dimensions: ${imageElement.width}x${imageElement.height}`
     );
     
-    // Use TinyFaceDetector with proper options and detectionMethod
+    // Use TinyFaceDetector with proper options
     const detectionOptions = new faceapi.TinyFaceDetectorOptions({ 
       inputSize: 416, 
       scoreThreshold: 0.5 
