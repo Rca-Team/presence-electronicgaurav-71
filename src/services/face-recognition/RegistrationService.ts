@@ -42,14 +42,32 @@ export const registerFace = async (
     }
     
     // Create a proper File object from the blob
-    const file = new File([imageBlob], `face_${uuidv4()}.jpg`, { type: 'image/jpeg' });
+    const uniqueId = uuidv4();
+    const file = new File([imageBlob], `face_${uniqueId}.jpg`, { type: 'image/jpeg' });
     
-    // Upload face image to storage
-    const filePath = `faces/${uuidv4()}.jpg`;
+    // Generate a unique file path WITHOUT the bucket name in the path
+    const filePath = `${uniqueId}.jpg`;
     console.log('Uploading with path:', filePath);
     
-    const imageUrl = await uploadImage(file, filePath);
-    console.log('Face image uploaded successfully:', imageUrl);
+    // Try to upload the image
+    let imageUrl;
+    try {
+      imageUrl = await uploadImage(file, filePath);
+      console.log('Face image uploaded successfully:', imageUrl);
+    } catch (uploadError) {
+      console.error('Error uploading image, attempting fallback:', uploadError);
+      
+      // Fallback: store the image directly in the attendance record as base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(imageBlob);
+      });
+      
+      imageUrl = await base64Promise;
+      console.log('Image stored as base64 (fallback method)');
+    }
     
     // Prepare metadata as a plain object that conforms to Json type
     const metadata: Record<string, any> = {
@@ -117,8 +135,9 @@ export const uploadFaceImage = async (imageBlob: Blob): Promise<string> => {
     }
     
     // Create a unique filename
-    const file = new File([imageBlob], `face_${uuidv4()}.jpg`, { type: 'image/jpeg' });
-    const filePath = `faces/${uuidv4()}.jpg`;
+    const uniqueId = uuidv4();
+    const file = new File([imageBlob], `face_${uniqueId}.jpg`, { type: 'image/jpeg' });
+    const filePath = `${uniqueId}.jpg`;
     
     console.log('Uploading image as:', filePath);
     
