@@ -18,6 +18,11 @@ const AttendanceCalendarView: React.FC<AttendanceCalendarViewProps> = ({
   lateAttendanceDays,
   absentDays
 }) => {
+  // Get current date for today indicator
+  const today = new Date();
+  // Get current month for default display
+  const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  
   return (
     <div className="flex flex-col items-center">
       <CalendarLegend />
@@ -48,9 +53,9 @@ const AttendanceCalendarView: React.FC<AttendanceCalendarViewProps> = ({
           present: attendanceDays || [],
           late: lateAttendanceDays || [],
           absent: absentDays || [],
-          today: [new Date(2025, 2, 8)]
+          today: [today]
         }}
-        defaultMonth={new Date(2025, 2, 1)}
+        defaultMonth={currentMonth}
       />
     </div>
   );

@@ -18,7 +18,7 @@ const CalendarLegend: React.FC = () => {
       </div>
       <div className="flex items-center">
         <div className="h-3 w-3 rounded-full bg-accent mr-2"></div>
-        <span className="text-sm">Today (March 8)</span>
+        <span className="text-sm">Today</span>
       </div>
     </div>
   );

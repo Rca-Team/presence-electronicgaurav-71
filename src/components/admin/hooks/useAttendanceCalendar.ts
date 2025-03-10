@@ -17,13 +17,19 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
   const [lateAttendanceDays, setLateAttendanceDays] = useState<Date[]>([]);
   const [absentDays, setAbsentDays] = useState<Date[]>([]);
   const [selectedFace, setSelectedFace] = useState<FaceInfo | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date(2025, 2, 8));
+  
+  // Use current date as default selected date
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  
   const [loading, setLoading] = useState(false);
   const [dailyAttendance, setDailyAttendance] = useState<{
     id: string;
     timestamp: string;
     status: string;
   }[]>([]);
+  
+  // Generate working days for current month
+  const currentDate = new Date();
   const [workingDays, setWorkingDays] = useState<Date[]>([]);
 
   // Subscribe to real-time updates
@@ -33,7 +39,9 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
     if (selectedFaceId) {
       fetchFaceDetails(selectedFaceId);
       loadAttendanceRecords(selectedFaceId);
-      setWorkingDays(generateWorkingDays(2025, 2));
+      
+      // Generate working days for the current month
+      setWorkingDays(generateWorkingDays(currentDate.getFullYear(), currentDate.getMonth()));
 
       attendanceChannel = supabase
         .channel(`attendance-calendar-${selectedFaceId}`)
@@ -81,8 +89,9 @@ export const useAttendanceCalendar = (selectedFaceId: string | null) => {
   // Calculate absent days
   useEffect(() => {
     if (workingDays.length > 0 && (attendanceDays.length > 0 || lateAttendanceDays.length > 0)) {
+      const today = new Date();
       const absent = workingDays.filter(workDay => {
-        const today = new Date(2025, 2, 8);
+        // Only consider days up to today for absences
         if (workDay > today) return false;
         
         return !isDateInArray(workDay, attendanceDays) && !isDateInArray(workDay, lateAttendanceDays);
