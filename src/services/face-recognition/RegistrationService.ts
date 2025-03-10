@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { uploadImage } from './StorageService';
 import { v4 as uuidv4 } from 'uuid';
@@ -70,5 +71,43 @@ export const uploadFaceImage = async (imageBlob: Blob): Promise<string> => {
   } catch (error) {
     console.error('Error uploading face image:', error);
     throw error;
+  }
+};
+
+// Add the missing storeUnrecognizedFace function
+export const storeUnrecognizedFace = async (imageData: string): Promise<void> => {
+  try {
+    console.log('Storing unrecognized face');
+    
+    // Convert base64 image data to a Blob
+    const response = await fetch(imageData);
+    const blob = await response.blob();
+    
+    // Upload the image
+    const imageUrl = await uploadFaceImage(blob);
+    
+    // Create a device info object with the current timestamp
+    const deviceInfo = {
+      userAgent: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+      firebase_image_url: imageUrl,
+    };
+    
+    // Insert a record with status "unauthorized"
+    const { error } = await supabase
+      .from('attendance_records')
+      .insert([
+        {
+          user_id: null, // No user associated
+          status: 'unauthorized',
+          device_info: deviceInfo
+        }
+      ]);
+    
+    if (error) {
+      console.error('Error storing unrecognized face:', error);
+    }
+  } catch (error) {
+    console.error('Failed to store unrecognized face:', error);
   }
 };

@@ -129,19 +129,12 @@ const Register = () => {
       
       // Register face with our service - SKIP the profiles creation
       const success = await registerFace(
-        userId,
-        faceDescriptor,
-        {
-          name: formData.name,
-          employee_id: formData.employeeId,
-          department: formData.department,
-          position: formData.position || undefined,
-          year: formData.year || undefined,
-          major: formData.major || undefined,
-          standing: formData.standing || undefined,
-          starting_year: formData.startingYear || undefined,
-          image_url: faceImage || undefined,
-        }
+        faceImage ? await (await fetch(faceImage)).blob() : new Blob(),
+        formData.name,
+        formData.employeeId,
+        formData.department,
+        formData.position || '',
+        userId
       );
       
       if (success) {
