@@ -1,16 +1,11 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
 import { 
   loadModels, 
   getFaceDescriptor,
-  areModelsLoaded
-} from '@/services/FaceRecognitionService';
-import {
+  areModelsLoaded,
   recognizeFace,
-  recordAttendance
-} from '@/services/FaceRecognitionService';
-import {
+  recordAttendance,
   storeUnrecognizedFace
 } from '@/services/FaceRecognitionService';
 import { toast } from 'sonner';

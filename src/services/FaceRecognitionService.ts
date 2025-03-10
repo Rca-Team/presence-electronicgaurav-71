@@ -4,7 +4,8 @@ export {
   loadModels, 
   getFaceDescriptor,
   descriptorToString,
-  stringToDescriptor
+  stringToDescriptor,
+  areModelsLoaded
 } from './face-recognition/ModelService';
 
 export {
