@@ -41,8 +41,14 @@ export const registerFace = async (
       console.warn('No face descriptor provided for registration. This may limit face recognition capabilities.');
     }
     
+    // Create a proper File object from the blob
+    const file = new File([imageBlob], `face_${uuidv4()}.jpg`, { type: 'image/jpeg' });
+    
     // Upload face image to storage
-    const imageUrl = await uploadFaceImage(imageBlob);
+    const filePath = `faces/${uuidv4()}.jpg`;
+    console.log('Uploading with path:', filePath);
+    
+    const imageUrl = await uploadImage(file, filePath);
     console.log('Face image uploaded successfully:', imageUrl);
     
     // Prepare metadata as a plain object that conforms to Json type
@@ -71,11 +77,15 @@ export const registerFace = async (
 
     console.log('Inserting attendance record with metadata');
     
+    // Use a valid user ID or generate a new one
+    const effectiveUserId = userId || uuidv4();
+    console.log('Using user ID:', effectiveUserId);
+    
     // Insert registration record
     const { data: recordData, error: recordError } = await supabase
       .from('attendance_records')
       .insert({
-        user_id: userId || uuidv4(), // Ensure we always have a user ID
+        user_id: effectiveUserId,
         timestamp: new Date().toISOString(),
         status: 'registered',
         device_info: deviceInfo,

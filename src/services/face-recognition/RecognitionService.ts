@@ -17,7 +17,7 @@ interface RecognitionResult {
   confidence?: number;
 }
 
-// Custom type for the device_info object structure we're working with
+// Fixed interface for DeviceInfo properly defining the structure
 interface DeviceInfo {
   metadata?: {
     name?: string;
@@ -30,6 +30,7 @@ interface DeviceInfo {
   type?: string;
   timestamp?: string;
   registration?: boolean;
+  firebase_image_url?: string; // For the unrecognized face case
 }
 
 export async function recognizeFace(faceDescriptor: Float32Array): Promise<RecognitionResult> {

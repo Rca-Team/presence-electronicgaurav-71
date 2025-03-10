@@ -23,7 +23,8 @@ export const uploadImage = async (file: File, path: string, bucket: string = 'fa
     if (!bucketExists) {
       console.log(`Bucket '${bucket}' does not exist, attempting to create it`);
       const { error: createError } = await supabase.storage.createBucket(bucket, {
-        public: true
+        public: true,
+        fileSizeLimit: 5242880 // 5MB limit for face images
       });
       
       if (createError) {
