@@ -5,12 +5,15 @@ import * as faceapi from 'face-api.js';
 let modelsLoaded = false;
 let isLoadingModels = false;
 let loadAttempts = 0;
-const MAX_LOAD_ATTEMPTS = 3;
+const MAX_LOAD_ATTEMPTS = 5; // Increased from 3 to 5
 const MODEL_PATHS = [
   { net: faceapi.nets.tinyFaceDetector, name: 'TinyFaceDetector' },
   { net: faceapi.nets.faceLandmark68Net, name: 'FaceLandmark68' },
   { net: faceapi.nets.faceRecognitionNet, name: 'FaceRecognition' }
 ];
+
+// Helper function to simulate a delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function loadModels() {
   // Return if models already loaded
@@ -69,13 +72,28 @@ export async function loadModels() {
       throw new Error(`Cannot access face recognition models: ${error.message}`);
     }
     
-    // Load models with proper error handling for each model
+    // Add delay between model loads to prevent race conditions
     for (const model of MODEL_PATHS) {
       console.log(`Loading ${model.name} model...`);
       try {
+        // Ensure previous model load had time to complete
+        await delay(300);
+        
+        // If model is already loaded, skip it
+        if (model.net.isLoaded) {
+          console.log(`${model.name} model already loaded, skipping...`);
+          continue;
+        }
+        
         // Log the model load path for debugging
         console.log(`Loading from: /models for ${model.name}`);
         await model.net.load('/models');
+        
+        // Verify model was actually loaded
+        if (!model.net.isLoaded) {
+          throw new Error(`${model.name} reported success but isLoaded is false`);
+        }
+        
         console.log(`${model.name} model loaded successfully`);
       } catch (modelError) {
         console.error(`Error loading ${model.name} model:`, modelError);
@@ -83,7 +101,7 @@ export async function loadModels() {
       }
     }
     
-    // Verify models are loaded
+    // Double-check all models are loaded
     const allLoaded = MODEL_PATHS.every(model => model.net.isLoaded);
     if (!allLoaded) {
       throw new Error('Some models reported as not loaded after loading process');
@@ -106,9 +124,14 @@ export async function loadModels() {
       });
     }
     
-    // Retry logic
+    // Progressive retry with exponential backoff
     if (loadAttempts < MAX_LOAD_ATTEMPTS) {
-      console.log(`Retrying model load (attempt ${loadAttempts}/${MAX_LOAD_ATTEMPTS})...`);
+      const backoffTime = Math.min(1000 * Math.pow(2, loadAttempts - 1), 10000);
+      console.log(`Retrying model load in ${backoffTime}ms (attempt ${loadAttempts}/${MAX_LOAD_ATTEMPTS})...`);
+      
+      // Wait before retry with exponential backoff
+      await delay(backoffTime);
+      
       return loadModels(); // Recursive retry
     } else {
       console.error(`Failed to load models after ${MAX_LOAD_ATTEMPTS} attempts`);
@@ -121,6 +144,17 @@ export async function loadModels() {
 // Add a function to verify if models are loaded
 export function areModelsLoaded() {
   return modelsLoaded;
+}
+
+// Add a function to force reload models
+export async function forceReloadModels() {
+  // Reset the loaded state
+  modelsLoaded = false;
+  isLoadingModels = false;
+  loadAttempts = 0;
+  
+  // Attempt to reload models
+  return loadModels();
 }
 
 // Helper functions for face descriptors
@@ -194,7 +228,7 @@ export async function getFaceDescriptor(imageElement: HTMLImageElement | HTMLVid
     if (!modelsLoaded) {
       modelsLoaded = false; // Force reload
       try {
-        await loadModels();
+        await forceReloadModels();
         // Try detection again after reload
         return getFaceDescriptor(imageElement);
       } catch (reloadError) {
