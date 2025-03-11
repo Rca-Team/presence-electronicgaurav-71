@@ -61,8 +61,8 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ selectedFaceId 
                 <div className="space-y-4">
                   <StudentInfoCard 
                     selectedFace={selectedFace} 
-                    dailyAttendance={dailyAttendance}
-                    selectedDate={selectedDate}
+                    attendanceDays={attendanceDays} 
+                    lateAttendanceDays={lateAttendanceDays} 
                   />
                   
                   {selectedDate && (

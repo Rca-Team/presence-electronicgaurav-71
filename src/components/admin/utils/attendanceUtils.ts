@@ -7,14 +7,6 @@ export interface FaceInfo {
   employee_id: string;
   department: string;
   position: string;
-  userId?: string;
-  id?: string;
-  photo?: string;
-  registrationDate?: string;
-  lastAttendance?: string;
-  totalAttendance?: number;
-  // Additional props to match what's being used
-  employeeId?: string;
 }
 
 // Function to check if a date exists in an array of dates
@@ -48,7 +40,7 @@ export const fetchSelectedFace = async (faceId: string): Promise<FaceInfo> => {
   try {
     const { data, error } = await supabase
       .from('attendance_records')
-      .select('device_info, user_id, id')
+      .select('device_info, user_id')
       .eq('id', faceId)
       .single();
         
@@ -57,7 +49,7 @@ export const fetchSelectedFace = async (faceId: string): Promise<FaceInfo> => {
       
       const { data: userData, error: userError } = await supabase
         .from('attendance_records')
-        .select('device_info, id')
+        .select('device_info')
         .eq('user_id', faceId)
         .single();
         
@@ -67,11 +59,8 @@ export const fetchSelectedFace = async (faceId: string): Promise<FaceInfo> => {
         return {
           name: 'Unknown Student',
           employee_id: faceId,
-          employeeId: faceId,
           department: 'N/A',
-          position: 'Student',
-          userId: faceId,
-          id: faceId
+          position: 'Student'
         };
       }
       
@@ -85,12 +74,8 @@ export const fetchSelectedFace = async (faceId: string): Promise<FaceInfo> => {
           return {
             name: metadata.name || 'Unknown Student',
             employee_id: metadata.employee_id || faceId,
-            employeeId: metadata.employee_id || faceId,
             department: metadata.department || 'N/A',
             position: metadata.position || 'Student',
-            userId: faceId,
-            id: userData.id || faceId,
-            photo: metadata.firebase_image_url
           };
         }
       }
@@ -98,11 +83,8 @@ export const fetchSelectedFace = async (faceId: string): Promise<FaceInfo> => {
       return {
         name: 'Unknown Student',
         employee_id: faceId,
-        employeeId: faceId,
         department: 'N/A',
-        position: 'Student',
-        userId: faceId,
-        id: faceId
+        position: 'Student'
       };
     }
 
@@ -116,37 +98,24 @@ export const fetchSelectedFace = async (faceId: string): Promise<FaceInfo> => {
         return {
           name: metadata.name || 'Unknown Student',
           employee_id: metadata.employee_id || data.user_id || faceId,
-          employeeId: metadata.employee_id || data.user_id || faceId,
           department: metadata.department || 'N/A',
           position: metadata.position || 'Student',
-          userId: data.user_id || faceId,
-          id: data.id || faceId,
-          photo: metadata.firebase_image_url,
-          registrationDate: metadata.registration_date,
-          lastAttendance: metadata.last_attendance,
-          totalAttendance: metadata.total_attendance || 0
         };
       }
       
       return {
         name: 'Unknown Student',
         employee_id: data.user_id || faceId,
-        employeeId: data.user_id || faceId,
         department: 'N/A',
-        position: 'Student',
-        userId: data.user_id || faceId,
-        id: data.id || faceId
+        position: 'Student'
       };
     }
     
     return {
       name: 'Unknown Student',
       employee_id: faceId,
-      employeeId: faceId,
       department: 'N/A',
-      position: 'Student',
-      userId: faceId,
-      id: faceId
+      position: 'Student'
     };
   } catch (error) {
     console.error('Error fetching face details:', error);
@@ -154,11 +123,8 @@ export const fetchSelectedFace = async (faceId: string): Promise<FaceInfo> => {
     return {
       name: 'Unknown Student',
       employee_id: faceId,
-      employeeId: faceId,
       department: 'N/A',
-      position: 'Student',
-      userId: faceId,
-      id: faceId
+      position: 'Student'
     };
   }
 };

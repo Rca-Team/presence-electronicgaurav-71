@@ -511,7 +511,7 @@ const AdminFacesList: React.FC<AdminFacesListProps> = ({
               className="w-full"
             />
             <p className="mt-2 text-sm text-muted-foreground">
-              Students will be marked as late if attendance time is after 8:30 AM.
+              Students will be marked as late if attendance time is after 9:00 AM.
             </p>
           </div>
           <DialogFooter>
