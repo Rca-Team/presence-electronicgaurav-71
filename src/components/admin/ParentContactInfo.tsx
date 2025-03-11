@@ -19,6 +19,7 @@ const ParentContactInfo: React.FC<ParentContactInfoProps> = ({ studentId }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [studentName, setStudentName] = useState('');
+  const [recordId, setRecordId] = useState<string | null>(null);
 
   useEffect(() => {
     if (studentId) {
@@ -32,7 +33,7 @@ const ParentContactInfo: React.FC<ParentContactInfoProps> = ({ studentId }) => {
     try {
       const { data, error } = await supabase
         .from('attendance_records')
-        .select('device_info')
+        .select('id, device_info')
         .eq('user_id', id)
         .contains('device_info', { registration: true })
         .single();
@@ -40,6 +41,7 @@ const ParentContactInfo: React.FC<ParentContactInfoProps> = ({ studentId }) => {
       if (error) throw error;
 
       if (data) {
+        setRecordId(data.id);
         const deviceInfo = data.device_info as any;
         const metadata = deviceInfo?.metadata || {};
         
@@ -61,6 +63,7 @@ const ParentContactInfo: React.FC<ParentContactInfoProps> = ({ studentId }) => {
     setParentEmail('');
     setParentPhone('');
     setStudentName('');
+    setRecordId(null);
   };
 
   const handleSave = async () => {
@@ -79,7 +82,7 @@ const ParentContactInfo: React.FC<ParentContactInfoProps> = ({ studentId }) => {
       // First get the current record
       const { data: currentData, error: fetchError } = await supabase
         .from('attendance_records')
-        .select('device_info')
+        .select('id, device_info')
         .eq('user_id', studentId)
         .contains('device_info', { registration: true })
         .single();

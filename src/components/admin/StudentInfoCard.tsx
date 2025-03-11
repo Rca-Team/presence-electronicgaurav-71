@@ -60,7 +60,7 @@ const StudentInfoCard: React.FC<StudentInfoCardProps> = ({
       <CardHeader>
         <div className="flex justify-between items-start">
           <CardTitle>Student Information</CardTitle>
-          <Badge variant="outline">{selectedFace.id}</Badge>
+          <Badge variant="outline">{selectedFace.id || 'N/A'}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -93,7 +93,7 @@ const StudentInfoCard: React.FC<StudentInfoCardProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InfoItem label="ID" value={selectedFace.employeeId} icon={User} />
+                <InfoItem label="ID" value={selectedFace.employeeId || selectedFace.employee_id} icon={User} />
                 <InfoItem label="Department" value={selectedFace.department} icon={BookOpen} />
                 <InfoItem
                   label="Registration Date"
@@ -120,14 +120,21 @@ const StudentInfoCard: React.FC<StudentInfoCardProps> = ({
                 <h3 className="text-sm font-medium mb-3">
                   Attendance on {selectedDate.toLocaleDateString()}
                 </h3>
-                <DailyAttendanceDetails dailyAttendance={dailyAttendance} />
+                <DailyAttendanceDetails 
+                  dailyAttendance={dailyAttendance}
+                  selectedDate={selectedDate}
+                  isDateInArray={() => false} // Placeholder function
+                  attendanceDays={[]} // Placeholder empty array
+                  lateAttendanceDays={[]} // Placeholder empty array
+                  absentDays={[]} // Placeholder empty array 
+                />
               </div>
             )}
           </TabsContent>
           
           <TabsContent value="contact">
             <div className="pt-2">
-              <ParentContactInfo studentId={selectedFace.userId} />
+              <ParentContactInfo studentId={selectedFace.userId || selectedFace.id} />
             </div>
           </TabsContent>
         </Tabs>
