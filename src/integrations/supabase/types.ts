@@ -9,54 +9,111 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      attendance_records: {
+      face_profiles: {
         Row: {
-          confidence_score: number | null
-          device_info: Json | null
+          created_at: string | null
+          face_data: string
           id: string
-          status: string
-          timestamp: string | null
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
-          confidence_score?: number | null
-          device_info?: Json | null
+          created_at?: string | null
+          face_data: string
           id?: string
-          status: string
-          timestamp?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
-          confidence_score?: number | null
-          device_info?: Json | null
+          created_at?: string | null
+          face_data?: string
           id?: string
-          status?: string
-          timestamp?: string | null
+          updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          chat_id: string
+          content: string
+          created_at: string | null
+          id: string
+          image_url: string | null
+          is_user: boolean | null
+        }
+        Insert: {
+          chat_id: string
+          content: string
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_user?: boolean | null
+        }
+        Update: {
+          chat_id?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_user?: boolean | null
         }
         Relationships: []
       }
       profiles: {
         Row: {
           avatar_url: string | null
-          email: string | null
           id: string
           updated_at: string | null
           username: string | null
         }
         Insert: {
           avatar_url?: string | null
-          email?: string | null
           id: string
           updated_at?: string | null
           username?: string | null
         }
         Update: {
           avatar_url?: string | null
-          email?: string | null
           id?: string
           updated_at?: string | null
           username?: string | null
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          created_at: string | null
+          description: string
+          href: string
+          icon: string
+          id: string
+          image: string
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          href: string
+          icon: string
+          id?: string
+          image: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          href?: string
+          icon?: string
+          id?: string
+          image?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -68,7 +125,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      attendance_status: "present" | "unauthorized"
     }
     CompositeTypes: {
       [_ in never]: never
