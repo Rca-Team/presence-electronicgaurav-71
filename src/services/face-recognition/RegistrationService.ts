@@ -45,14 +45,14 @@ export const registerFace = async (
     const uniqueId = uuidv4();
     const file = new File([imageBlob], `face_${uniqueId}.jpg`, { type: 'image/jpeg' });
     
-    // Generate a unique file path WITHOUT the bucket name in the path
+    // Generate a unique file path - simplified to avoid path issues
     const filePath = `${uniqueId}.jpg`;
     console.log('Uploading with path:', filePath);
     
-    // Try to upload the image
+    // Try to upload the image to public bucket
     let imageUrl;
     try {
-      imageUrl = await uploadImage(file, filePath);
+      imageUrl = await uploadImage(file, filePath, 'public');
       console.log('Face image uploaded successfully:', imageUrl);
     } catch (uploadError) {
       console.error('Error uploading image, attempting fallback:', uploadError);

@@ -1,39 +1,46 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Uploads an image to Supabase Storage.
- * If the upload fails in the primary bucket, it attempts to upload to the 'public' bucket.
+ * Uses the 'public' bucket as the primary target instead of trying to create a new bucket.
  * 
  * @param file - The file to upload.
  * @param path - The storage path.
- * @param bucket - The storage bucket (default: 'faces').
+ * @param bucket - The storage bucket (default: 'public').
  * @returns The public URL of the uploaded file.
  */
-export const uploadImage = async (file: File, path: string, bucket: string = 'faces'): Promise<string> => {
+export const uploadImage = async (file: File, path: string, bucket: string = 'public'): Promise<string> => {
   try {
     if (!file || file.size === 0) {
       throw new Error('Invalid file: The file is empty or invalid');
     }
 
-    const cleanPath = path.replace(`${bucket}/`, '');
-    console.log(`Uploading image to ${bucket}/${cleanPath}, file size: ${file.size} bytes`);
+    // Clean the path and make sure it doesn't have bucket prefix
+    const cleanPath = path.replace(/^(faces|public)\//, '');
+    const fullPath = bucket === 'public' ? `faces/${cleanPath}` : cleanPath;
+    
+    console.log(`Uploading image to ${bucket}/${fullPath}, file size: ${file.size} bytes`);
 
-    // Attempt to upload to the specified bucket
-    let { data, error } = await supabase.storage.from(bucket).upload(cleanPath, file, {
+    // Upload to specified bucket (defaulting to 'public')
+    let { data, error } = await supabase.storage.from(bucket).upload(fullPath, file, {
       cacheControl: '3600',
       upsert: true,
     });
 
-    // If upload fails, attempt to upload to the fallback 'public' bucket
     if (error) {
-      console.warn(`Error uploading to '${bucket}': ${error.message}. Trying 'public' bucket instead...`);
-      ({ data, error } = await supabase.storage.from('public').upload(`faces/${cleanPath}`, file, {
-        cacheControl: '3600',
-        upsert: true,
-      }));
+      console.warn(`Error uploading to '${bucket}': ${error.message}. Trying fallback method...`);
+      
+      // If primary bucket fails, always try the 'public' bucket which should exist by default
+      if (bucket !== 'public') {
+        ({ data, error } = await supabase.storage.from('public').upload(`faces/${cleanPath}`, file, {
+          cacheControl: '3600',
+          upsert: true,
+        }));
+      }
 
       if (error) {
-        console.error('Upload failed to both buckets:', error.message);
+        console.error('Upload failed to all buckets:', error.message);
         throw new Error(`Upload failed: ${error.message}`);
       }
 
@@ -42,7 +49,7 @@ export const uploadImage = async (file: File, path: string, bucket: string = 'fa
     }
 
     console.log('File uploaded successfully:', data?.path);
-    return supabase.storage.from(bucket).getPublicUrl(cleanPath).publicUrl;
+    return supabase.storage.from(bucket).getPublicUrl(fullPath).publicUrl;
   } catch (error) {
     console.error('Error in uploadImage:', error);
     throw error;
@@ -53,10 +60,12 @@ export const uploadImage = async (file: File, path: string, bucket: string = 'fa
  * Retrieves the public URL of a file from Supabase Storage.
  * 
  * @param path - The storage path.
- * @param bucket - The storage bucket (default: 'faces').
+ * @param bucket - The storage bucket (default: 'public').
  * @returns The public URL of the file.
  */
-export const getImageUrl = (path: string, bucket: string = 'faces'): string => {
-  const cleanPath = path.startsWith(`${bucket}/`) ? path.replace(`${bucket}/`, '') : path;
-  return supabase.storage.from(bucket).getPublicUrl(cleanPath).publicUrl;
+export const getImageUrl = (path: string, bucket: string = 'public'): string => {
+  // Clean up the path to ensure proper formatting
+  const cleanPath = path.replace(/^(faces|public)\//, '');
+  const fullPath = bucket === 'public' ? `faces/${cleanPath}` : cleanPath;
+  return supabase.storage.from(bucket).getPublicUrl(fullPath).publicUrl;
 };
