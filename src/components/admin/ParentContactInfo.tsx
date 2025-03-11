@@ -40,7 +40,7 @@ const ParentContactInfo: React.FC<ParentContactInfoProps> = ({ studentId }) => {
 
       if (error) throw error;
 
-      if (data) {
+      if (data && data.id) {
         setRecordId(data.id);
         const deviceInfo = data.device_info as any;
         const metadata = deviceInfo?.metadata || {};

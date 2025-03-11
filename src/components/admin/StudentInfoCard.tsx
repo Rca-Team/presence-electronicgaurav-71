@@ -93,8 +93,8 @@ const StudentInfoCard: React.FC<StudentInfoCardProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InfoItem label="ID" value={selectedFace.employeeId || selectedFace.employee_id} icon={User} />
-                <InfoItem label="Department" value={selectedFace.department} icon={BookOpen} />
+                <InfoItem label="ID" value={selectedFace.employee_id || ''} icon={User} />
+                <InfoItem label="Department" value={selectedFace.department || ''} icon={BookOpen} />
                 <InfoItem
                   label="Registration Date"
                   value={selectedFace.registrationDate || 'Not available'}
@@ -120,21 +120,25 @@ const StudentInfoCard: React.FC<StudentInfoCardProps> = ({
                 <h3 className="text-sm font-medium mb-3">
                   Attendance on {selectedDate.toLocaleDateString()}
                 </h3>
-                <DailyAttendanceDetails 
-                  dailyAttendance={dailyAttendance}
-                  selectedDate={selectedDate}
-                  isDateInArray={() => false} // Placeholder function
-                  attendanceDays={[]} // Placeholder empty array
-                  lateAttendanceDays={[]} // Placeholder empty array
-                  absentDays={[]} // Placeholder empty array 
-                />
+                {dailyAttendance.length > 0 ? (
+                  <DailyAttendanceDetails 
+                    dailyAttendance={dailyAttendance}
+                    selectedDate={selectedDate}
+                    isDateInArray={() => false} // Placeholder function
+                    attendanceDays={[]} // Placeholder empty array
+                    lateAttendanceDays={[]} // Placeholder empty array
+                    absentDays={[]} // Placeholder empty array 
+                  />
+                ) : (
+                  <p className="text-muted-foreground text-sm">No attendance records for this date.</p>
+                )}
               </div>
             )}
           </TabsContent>
           
           <TabsContent value="contact">
             <div className="pt-2">
-              <ParentContactInfo studentId={selectedFace.userId || selectedFace.id} />
+              <ParentContactInfo studentId={selectedFace.userId || selectedFace.id || ''} />
             </div>
           </TabsContent>
         </Tabs>
