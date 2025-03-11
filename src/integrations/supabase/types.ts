@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      attendance_records: {
+        Row: {
+          confidence_score: number | null
+          device_info: Json | null
+          id: string
+          image_url: string | null
+          status: string | null
+          timestamp: string
+          user_id: string | null
+        }
+        Insert: {
+          confidence_score?: number | null
+          device_info?: Json | null
+          id?: string
+          image_url?: string | null
+          status?: string | null
+          timestamp?: string
+          user_id?: string | null
+        }
+        Update: {
+          confidence_score?: number | null
+          device_info?: Json | null
+          id?: string
+          image_url?: string | null
+          status?: string | null
+          timestamp?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       face_profiles: {
         Row: {
           created_at: string | null
