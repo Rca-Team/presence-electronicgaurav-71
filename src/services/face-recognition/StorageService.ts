@@ -45,11 +45,11 @@ export const uploadImage = async (file: File, path: string, bucket: string = 'pu
       }
 
       console.log('File uploaded successfully to public bucket:', data?.path);
-      return supabase.storage.from('public').getPublicUrl(`faces/${cleanPath}`).publicUrl;
+      return supabase.storage.from('public').getPublicUrl(`faces/${cleanPath}`).data.publicUrl;
     }
 
     console.log('File uploaded successfully:', data?.path);
-    return supabase.storage.from(bucket).getPublicUrl(fullPath).publicUrl;
+    return supabase.storage.from(bucket).getPublicUrl(fullPath).data.publicUrl;
   } catch (error) {
     console.error('Error in uploadImage:', error);
     throw error;
@@ -67,5 +67,5 @@ export const getImageUrl = (path: string, bucket: string = 'public'): string => 
   // Clean up the path to ensure proper formatting
   const cleanPath = path.replace(/^(faces|public)\//, '');
   const fullPath = bucket === 'public' ? `faces/${cleanPath}` : cleanPath;
-  return supabase.storage.from(bucket).getPublicUrl(fullPath).publicUrl;
+  return supabase.storage.from(bucket).getPublicUrl(fullPath).data.publicUrl;
 };
