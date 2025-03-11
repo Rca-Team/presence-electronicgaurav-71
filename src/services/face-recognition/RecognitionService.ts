@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { descriptorToString, stringToDescriptor } from './ModelService';
+import { sendLateNotification } from '../notification/NotificationService';
 
 interface Employee {
   id: string;
@@ -26,6 +27,7 @@ interface DeviceInfo {
     position?: string;
     firebase_image_url?: string;
     faceDescriptor?: string;
+    parent_email?: string; // Added parent email field
   };
   type?: string;
   timestamp?: string;
@@ -170,9 +172,91 @@ export async function recordAttendance(
     }
     
     console.log('Attendance recorded successfully:', data);
+    
+    // Send notification for late arrivals
+    if (status === 'late') {
+      try {
+        // Get student details to include in notification
+        const { data: studentData } = await supabase
+          .from('attendance_records')
+          .select('device_info')
+          .eq('user_id', userId)
+          .contains('device_info', { registration: true })
+          .single();
+          
+        if (studentData) {
+          const deviceInfo = studentData.device_info as DeviceInfo;
+          const metadata = deviceInfo?.metadata || {};
+          const studentName = metadata.name;
+          
+          // Send late notification
+          await sendLateNotification(userId, studentName);
+        }
+      } catch (notifError) {
+        console.error('Failed to send late notification, but attendance was recorded:', notifError);
+      }
+    }
+    
     return data;
   } catch (error) {
     console.error('Error in recordAttendance:', error);
+    throw error;
+  }
+}
+
+// New function to mark a student as absent and send notification
+export async function markAsAbsent(userId: string): Promise<any> {
+  try {
+    console.log(`Marking student ${userId} as absent`);
+    
+    const timestamp = new Date().toISOString();
+    const deviceInfo = {
+      type: 'system',
+      timestamp,
+      automatic: true
+    };
+    
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .insert({
+        user_id: userId,
+        timestamp,
+        status: 'absent',
+        device_info: deviceInfo,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error marking student as absent:', error);
+      throw new Error(`Failed to mark student as absent: ${error.message}`);
+    }
+    
+    console.log('Student marked as absent successfully:', data);
+    
+    // Get student details for notification
+    const { data: studentData } = await supabase
+      .from('attendance_records')
+      .select('device_info')
+      .eq('user_id', userId)
+      .contains('device_info', { registration: true })
+      .single();
+      
+    if (studentData) {
+      const deviceInfo = studentData.device_info as DeviceInfo;
+      const metadata = deviceInfo?.metadata || {};
+      const studentName = metadata.name;
+      
+      // Import at runtime to avoid circular dependencies
+      const { sendAbsenceNotification } = await import('../notification/NotificationService');
+      
+      // Send absence notification
+      await sendAbsenceNotification(userId, studentName);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in markAsAbsent:', error);
     throw error;
   }
 }
