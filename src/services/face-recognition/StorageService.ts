@@ -16,40 +16,56 @@ export const uploadImage = async (file: File, path: string, bucket: string = 'pu
       throw new Error('Invalid file: The file is empty or invalid');
     }
 
+    // ALWAYS use 'public' bucket for storage - simplifies permissions and avoids bucket creation issues
+    const safeBucket = 'public';
+    
     // Clean the path and make sure it doesn't have bucket prefix
     const cleanPath = path.replace(/^(faces|public)\//, '');
-    const fullPath = bucket === 'public' ? `faces/${cleanPath}` : cleanPath;
+    const fullPath = `faces/${cleanPath}`;
     
-    console.log(`Uploading image to ${bucket}/${fullPath}, file size: ${file.size} bytes`);
+    console.log(`Uploading image to ${safeBucket}/${fullPath}, file size: ${file.size} bytes`);
 
-    // Upload to specified bucket (defaulting to 'public')
-    let { data, error } = await supabase.storage.from(bucket).upload(fullPath, file, {
-      cacheControl: '3600',
-      upsert: true,
-    });
-
-    if (error) {
-      console.warn(`Error uploading to '${bucket}': ${error.message}. Trying fallback method...`);
-      
-      // If primary bucket fails, always try the 'public' bucket which should exist by default
-      if (bucket !== 'public') {
-        ({ data, error } = await supabase.storage.from('public').upload(`faces/${cleanPath}`, file, {
+    // Upload to public bucket with added retries
+    let uploadSuccess = false;
+    let attempt = 0;
+    let data;
+    let lastError;
+    
+    while (!uploadSuccess && attempt < 3) {
+      try {
+        const result = await supabase.storage.from(safeBucket).upload(fullPath, file, {
           cacheControl: '3600',
           upsert: true,
-        }));
+        });
+        
+        data = result.data;
+        lastError = result.error;
+        
+        if (!lastError) {
+          uploadSuccess = true;
+          console.log(`File uploaded successfully on attempt ${attempt + 1}:`, data?.path);
+        } else {
+          console.warn(`Upload attempt ${attempt + 1} failed:`, lastError.message);
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (err) {
+        lastError = err;
+        console.warn(`Upload attempt ${attempt + 1} exception:`, err);
       }
-
-      if (error) {
-        console.error('Upload failed to all buckets:', error.message);
-        throw new Error(`Upload failed: ${error.message}`);
-      }
-
-      console.log('File uploaded successfully to public bucket:', data?.path);
-      return supabase.storage.from('public').getPublicUrl(`faces/${cleanPath}`).data.publicUrl;
+      
+      attempt++;
     }
 
-    console.log('File uploaded successfully:', data?.path);
-    return supabase.storage.from(bucket).getPublicUrl(fullPath).data.publicUrl;
+    if (!uploadSuccess) {
+      console.error('All upload attempts failed');
+      // Return null to indicate failure - the calling code will handle fallback to base64
+      throw new Error(`Upload failed after ${attempt} attempts: ${lastError?.message || 'Unknown error'}`);
+    }
+
+    // Success - return the public URL
+    const publicUrlResult = supabase.storage.from(safeBucket).getPublicUrl(fullPath);
+    return publicUrlResult.data.publicUrl;
   } catch (error) {
     console.error('Error in uploadImage:', error);
     throw error;
@@ -64,8 +80,12 @@ export const uploadImage = async (file: File, path: string, bucket: string = 'pu
  * @returns The public URL of the file.
  */
 export const getImageUrl = (path: string, bucket: string = 'public'): string => {
+  // Always use public bucket for consistency
+  const safeBucket = 'public';
+  
   // Clean up the path to ensure proper formatting
   const cleanPath = path.replace(/^(faces|public)\//, '');
-  const fullPath = bucket === 'public' ? `faces/${cleanPath}` : cleanPath;
-  return supabase.storage.from(bucket).getPublicUrl(fullPath).data.publicUrl;
+  const fullPath = `faces/${cleanPath}`;
+  
+  return supabase.storage.from(safeBucket).getPublicUrl(fullPath).data.publicUrl;
 };

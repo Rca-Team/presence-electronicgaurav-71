@@ -49,15 +49,16 @@ export const registerFace = async (
     const filePath = `${uniqueId}.jpg`;
     console.log('Uploading with path:', filePath);
     
-    // Try to upload the image to public bucket
+    // Try to upload the image to storage or use base64 as fallback
     let imageUrl;
     try {
-      imageUrl = await uploadImage(file, filePath, 'public');
+      // Using only the 'public' bucket to avoid permission issues
+      imageUrl = await uploadImage(file, filePath);
       console.log('Face image uploaded successfully:', imageUrl);
     } catch (uploadError) {
-      console.error('Error uploading image, attempting fallback:', uploadError);
+      console.error('Error uploading image, using base64 fallback:', uploadError);
       
-      // Fallback: store the image directly in the attendance record as base64
+      // Fallback: store the image directly as base64
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve(reader.result as string);
@@ -141,7 +142,7 @@ export const uploadFaceImage = async (imageBlob: Blob): Promise<string> => {
     
     console.log('Uploading image as:', filePath);
     
-    // Use our storage service upload function
+    // Use our storage service upload function with 'public' bucket only
     const publicUrl = await uploadImage(file, filePath);
     console.log('Image uploaded successfully:', publicUrl);
     return publicUrl;
@@ -151,7 +152,7 @@ export const uploadFaceImage = async (imageBlob: Blob): Promise<string> => {
   }
 };
 
-// Add the missing storeUnrecognizedFace function
+// Store unrecognized face
 export const storeUnrecognizedFace = async (imageData: string): Promise<void> => {
   try {
     console.log('Storing unrecognized face');
@@ -165,8 +166,14 @@ export const storeUnrecognizedFace = async (imageData: string): Promise<void> =>
       return;
     }
     
-    // Upload the image
-    const imageUrl = await uploadFaceImage(blob);
+    // Upload the image or use base64 as fallback
+    let imageUrl;
+    try {
+      imageUrl = await uploadFaceImage(blob);
+    } catch (uploadError) {
+      console.warn('Failed to upload unrecognized face, using base64 instead:', uploadError);
+      imageUrl = imageData; // Use original base64 data
+    }
     
     // Create a device info object with the current timestamp as a plain object
     const deviceInfo: Record<string, any> = {
