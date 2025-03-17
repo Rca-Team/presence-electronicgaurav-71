@@ -39,22 +39,30 @@ export const generatePrintableReport = ({
     });
   };
 
-  const totalWorkDays = workingDays.filter(date => {
-    const today = new Date(2025, 2, 8);
-    return date <= today;
-  }).length;
+  // Get today's date for reference
+  const today = new Date(2025, 2, 8);
   
-  const presentCount = attendanceDays.length;
-  const lateCount = lateAttendanceDays.length;
-  const absentCount = absentDays.length;
-  const attendanceRate = ((presentCount + lateCount) / totalWorkDays * 100).toFixed(1);
+  // Get date 30 days ago
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(today.getDate() - 30);
+  
+  // Filter to only include the last 30 days
+  const last30WorkDays = workingDays.filter(date => {
+    return date <= today && date >= thirtyDaysAgo;
+  });
+  
+  // Calculate stats for the last 30 days
+  const totalWorkDays = last30WorkDays.length;
+  
+  // Count present, late, and absent days within the last 30 days
+  const presentCount = attendanceDays.filter(date => date >= thirtyDaysAgo && date <= today).length;
+  const lateCount = lateAttendanceDays.filter(date => date >= thirtyDaysAgo && date <= today).length;
+  const absentCount = absentDays.filter(date => date >= thirtyDaysAgo && date <= today).length;
+  
+  const attendanceRate = totalWorkDays > 0 ? ((presentCount + lateCount) / totalWorkDays * 100).toFixed(1) : "0.0";
 
-  // Create rows for attendance table
-  const tableRows = workingDays
-    .filter(date => {
-      const today = new Date(2025, 2, 8);
-      return date <= today;
-    })
+  // Create rows for attendance table - but only for the last 30 days
+  const tableRows = last30WorkDays
     .sort((a, b) => b.getTime() - a.getTime())
     .map(date => {
       const isPresent = isDateInArray(date, attendanceDays);
@@ -184,7 +192,8 @@ export const generatePrintableReport = ({
       <body>
         <div class="header">
           <h1>Attendance Report</h1>
-          <p>Generated on ${formatDate(new Date(2025, 2, 8))}</p>
+          <p>Generated on ${formatDate(today)}</p>
+          <p>Showing last 30 days: ${formatDate(thirtyDaysAgo)} - ${formatDate(today)}</p>
         </div>
         
         <h2>Student Information</h2>
@@ -207,10 +216,10 @@ export const generatePrintableReport = ({
           </div>
         </div>
         
-        <h2>Attendance Summary</h2>
+        <h2>Attendance Summary (Last 30 Days)</h2>
         <div class="summary">
           <div class="info-item">
-            <div class="label">Total Working Days (to date):</div>
+            <div class="label">Total Working Days (last 30 days):</div>
             <div>${totalWorkDays}</div>
           </div>
           <div class="info-item">
@@ -231,7 +240,7 @@ export const generatePrintableReport = ({
           </div>
         </div>
         
-        <h2>Attendance Details</h2>
+        <h2>Attendance Details (Last 30 Days)</h2>
         <table>
           <thead>
             <tr>
@@ -276,11 +285,19 @@ export const exportToCSV = ({
     });
   };
 
-  const sortedDays = [...workingDays]
-    .filter(date => {
-      const today = new Date(2025, 2, 8);
-      return date <= today;
-    })
+  // Get today's date for reference
+  const today = new Date(2025, 2, 8);
+  
+  // Get date 30 days ago
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(today.getDate() - 30);
+  
+  // Filter to only include the last 30 days
+  const last30WorkDays = workingDays.filter(date => {
+    return date <= today && date >= thirtyDaysAgo;
+  });
+
+  const sortedDays = [...last30WorkDays]
     .sort((a, b) => b.getTime() - a.getTime());
   
   sortedDays.forEach(date => {
@@ -319,7 +336,7 @@ export const exportToCSV = ({
   const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `${selectedFace.name.replace(/\s+/g, '_')}_attendance.csv`);
+  link.setAttribute("download", `${selectedFace.name.replace(/\s+/g, '_')}_last_30_days_attendance.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
