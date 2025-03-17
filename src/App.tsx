@@ -13,7 +13,6 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Admin from './pages/Admin';
 import SplashScreen from "./components/SplashScreen";
-import AnimationDemo from "./components/AnimationDemo";
 
 const queryClient = new QueryClient();
 
@@ -53,7 +52,6 @@ function App() {
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/animations" element={<AnimationDemo />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

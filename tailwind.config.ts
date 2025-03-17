@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -111,14 +112,6 @@ export default {
 				},
 				'ping': {
 					'75%, 100%': { transform: 'scale(2)', opacity: '0' }
-				},
-				'scale-in': {
-					'0%': { transform: 'scale(0.9)', opacity: '0' },
-					'100%': { transform: 'scale(1)', opacity: '1' }
-				},
-				'bounce': {
-					'0%, 100%': { transform: 'translateY(0)' },
-					'50%': { transform: 'translateY(-10px)' }
 				}
 			},
 			animation: {
@@ -132,9 +125,7 @@ export default {
 				'slide-in-right': 'slide-in-right 0.5s ease-out',
 				'pulse-subtle': 'pulse-subtle 3s ease-in-out infinite',
 				'float': 'float 6s ease-in-out infinite',
-				'ping': 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
-				'scale-in': 'scale-in 0.3s ease-out',
-				'bounce': 'bounce 0.6s ease-in-out',
+				'ping': 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite'
 			},
 			backgroundImage: {
 				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
