@@ -39,30 +39,30 @@ export const generatePrintableReport = ({
     });
   };
 
-  // Get today's date for reference
-  const today = new Date(2025, 2, 8);
+  // Get today's date for reference - using a date with sufficient test data
+  const today = new Date(2025, 2, 8); // March 8, 2025
   
-  // Get date 30 days ago
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(today.getDate() - 30);
+  // Get date 90 days ago instead of 30 to show more test data
+  const ninetyDaysAgo = new Date(today);
+  ninetyDaysAgo.setDate(today.getDate() - 90);
   
-  // Filter to only include the last 30 days
-  const last30WorkDays = workingDays.filter(date => {
-    return date <= today && date >= thirtyDaysAgo;
+  // Filter to include the last 90 days for testing purposes
+  const filteredWorkDays = workingDays.filter(date => {
+    return date <= today && date >= ninetyDaysAgo;
   });
   
-  // Calculate stats for the last 30 days
-  const totalWorkDays = last30WorkDays.length;
+  // Calculate stats for the filtered days
+  const totalWorkDays = filteredWorkDays.length;
   
-  // Count present, late, and absent days within the last 30 days
-  const presentCount = attendanceDays.filter(date => date >= thirtyDaysAgo && date <= today).length;
-  const lateCount = lateAttendanceDays.filter(date => date >= thirtyDaysAgo && date <= today).length;
-  const absentCount = absentDays.filter(date => date >= thirtyDaysAgo && date <= today).length;
+  // Count present, late, and absent days within the date range
+  const presentCount = attendanceDays.filter(date => date >= ninetyDaysAgo && date <= today).length;
+  const lateCount = lateAttendanceDays.filter(date => date >= ninetyDaysAgo && date <= today).length;
+  const absentCount = absentDays.filter(date => date >= ninetyDaysAgo && date <= today).length;
   
   const attendanceRate = totalWorkDays > 0 ? ((presentCount + lateCount) / totalWorkDays * 100).toFixed(1) : "0.0";
 
-  // Create rows for attendance table - but only for the last 30 days
-  const tableRows = last30WorkDays
+  // Create rows for attendance table - using our expanded date range
+  const tableRows = filteredWorkDays
     .sort((a, b) => b.getTime() - a.getTime())
     .map(date => {
       const isPresent = isDateInArray(date, attendanceDays);
@@ -193,7 +193,7 @@ export const generatePrintableReport = ({
         <div class="header">
           <h1>Attendance Report</h1>
           <p>Generated on ${formatDate(today)}</p>
-          <p>Showing last 30 days: ${formatDate(thirtyDaysAgo)} - ${formatDate(today)}</p>
+          <p>Showing data from: ${formatDate(ninetyDaysAgo)} - ${formatDate(today)}</p>
         </div>
         
         <h2>Student Information</h2>
@@ -216,10 +216,10 @@ export const generatePrintableReport = ({
           </div>
         </div>
         
-        <h2>Attendance Summary (Last 30 Days)</h2>
+        <h2>Attendance Summary</h2>
         <div class="summary">
           <div class="info-item">
-            <div class="label">Total Working Days (last 30 days):</div>
+            <div class="label">Total Working Days:</div>
             <div>${totalWorkDays}</div>
           </div>
           <div class="info-item">
@@ -240,7 +240,7 @@ export const generatePrintableReport = ({
           </div>
         </div>
         
-        <h2>Attendance Details (Last 30 Days)</h2>
+        <h2>Attendance Details</h2>
         <table>
           <thead>
             <tr>
@@ -288,16 +288,16 @@ export const exportToCSV = ({
   // Get today's date for reference
   const today = new Date(2025, 2, 8);
   
-  // Get date 30 days ago
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(today.getDate() - 30);
+  // Get date 90 days ago for testing
+  const ninetyDaysAgo = new Date(today);
+  ninetyDaysAgo.setDate(today.getDate() - 90);
   
-  // Filter to only include the last 30 days
-  const last30WorkDays = workingDays.filter(date => {
-    return date <= today && date >= thirtyDaysAgo;
+  // Filter to include the last 90 days
+  const filteredWorkDays = workingDays.filter(date => {
+    return date <= today && date >= ninetyDaysAgo;
   });
 
-  const sortedDays = [...last30WorkDays]
+  const sortedDays = [...filteredWorkDays]
     .sort((a, b) => b.getTime() - a.getTime());
   
   sortedDays.forEach(date => {
@@ -336,7 +336,7 @@ export const exportToCSV = ({
   const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `${selectedFace.name.replace(/\s+/g, '_')}_last_30_days_attendance.csv`);
+  link.setAttribute("download", `${selectedFace.name.replace(/\s+/g, '_')}_attendance_report.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
