@@ -33,15 +33,15 @@ const AttendanceCalendarView: React.FC<AttendanceCalendarViewProps> = ({
         className="rounded-md border"
         modifiersStyles={{
           present: { 
-            backgroundColor: "rgb(34, 197, 94)", 
+            backgroundColor: "rgb(34, 197, 94)", // Bright green
             color: "white"
           },
           late: { 
-            backgroundColor: "rgb(245, 158, 11)", 
+            backgroundColor: "rgb(245, 158, 11)", // Amber/orange
             color: "white"
           },
           absent: {
-            backgroundColor: "rgb(239, 68, 68)",
+            backgroundColor: "rgb(239, 68, 68)", // Bright red
             color: "white"
           },
           today: {
