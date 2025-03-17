@@ -112,6 +112,10 @@ export default {
 				},
 				'ping': {
 					'75%, 100%': { transform: 'scale(2)', opacity: '0' }
+				},
+				'blur-in': {
+					'0%': { filter: 'blur(12px)', opacity: '0' },
+					'100%': { filter: 'blur(0)', opacity: '1' }
 				}
 			},
 			animation: {
@@ -125,11 +129,14 @@ export default {
 				'slide-in-right': 'slide-in-right 0.5s ease-out',
 				'pulse-subtle': 'pulse-subtle 3s ease-in-out infinite',
 				'float': 'float 6s ease-in-out infinite',
-				'ping': 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite'
+				'ping': 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
+				'blur-in': 'blur-in 0.5s ease-out'
 			},
 			backgroundImage: {
 				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-				'gradient-subtle': 'linear-gradient(to right, var(--gradient-start), var(--gradient-end))'
+				'gradient-subtle': 'linear-gradient(to right, var(--gradient-start), var(--gradient-end))',
+				'blue-white-blur': 'linear-gradient(109.6deg, rgba(223,234,247,1) 11.2%, rgba(244,248,252,1) 91.1%)',
+				'blue-white-radial': 'radial-gradient(circle at center, rgba(208, 228, 254, 0.8) 0%, rgba(240, 243, 254, 0.4) 70%)'
 			}
 		}
 	},
