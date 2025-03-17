@@ -1,3 +1,4 @@
+
 import React from 'react';
 import AnimationDemo from '../components/AnimationDemo';
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ const Index = () => {
           className="max-w-3xl mx-auto"
         >
           <div className="mb-6 flex justify-center">
-            <Logo size="xl" />
+            <Logo size="lg" />
           </div>
           
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-4">
