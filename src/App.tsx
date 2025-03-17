@@ -1,9 +1,10 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Register from "./pages/Register";
@@ -11,10 +12,13 @@ import Attendance from "./pages/Attendance";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Admin from './pages/Admin';
+import SplashAnimation from "./components/SplashAnimation";
 
 const queryClient = new QueryClient();
 
 function App() {
+  const [showSplash, setShowSplash] = useState(true);
+  
   useEffect(() => {
     const handleNavigation = () => {
       const mainContent = document.querySelector('main');
@@ -35,6 +39,15 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        
+        {/* Splash Animation */}
+        {showSplash && (
+          <SplashAnimation 
+            onComplete={() => setShowSplash(false)}
+            duration={3000} 
+          />
+        )}
+        
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
