@@ -109,6 +109,9 @@ export default {
 				'float': {
 					'0%, 100%': { transform: 'translateY(0)' },
 					'50%': { transform: 'translateY(-10px)' }
+				},
+				'ping': {
+					'75%, 100%': { transform: 'scale(2)', opacity: '0' }
 				}
 			},
 			animation: {
@@ -121,7 +124,8 @@ export default {
 				'slide-in-left': 'slide-in-left 0.5s ease-out',
 				'slide-in-right': 'slide-in-right 0.5s ease-out',
 				'pulse-subtle': 'pulse-subtle 3s ease-in-out infinite',
-				'float': 'float 6s ease-in-out infinite'
+				'float': 'float 6s ease-in-out infinite',
+				'ping': 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite'
 			},
 			backgroundImage: {
 				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
