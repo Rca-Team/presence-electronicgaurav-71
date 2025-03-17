@@ -5,7 +5,7 @@
 
 @layer base {
   :root {
-    --background: 210 30% 98%;
+    --background: 210 20% 98%;
     --foreground: 220 25% 10%;
 
     --card: 0 0% 100%;
@@ -35,8 +35,8 @@
 
     --radius: 0.75rem;
 
-    --gradient-start: rgba(208, 228, 254, 0.8);
-    --gradient-end: rgba(240, 243, 254, 0.8);
+    --gradient-start: rgba(228, 231, 238, 0.8);
+    --gradient-end: rgba(240, 243, 247, 0.8);
 
     --sidebar-background: 210 20% 98%;
     --sidebar-foreground: 220 25% 10%;
@@ -77,8 +77,8 @@
     --input: 220 25% 16%;
     --ring: 212 100% 47%;
 
-    --gradient-start: rgba(25, 40, 68, 0.8);
-    --gradient-end: rgba(35, 45, 65, 0.8);
+    --gradient-start: rgba(25, 30, 40, 0.8);
+    --gradient-end: rgba(35, 40, 50, 0.8);
 
     --sidebar-background: 220 25% 10%;
     --sidebar-foreground: 210 20% 98%;
@@ -98,12 +98,6 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    background-image: 
-      radial-gradient(circle at 20% 30%, var(--gradient-start) 0%, transparent 60%),
-      radial-gradient(circle at 80% 70%, var(--gradient-end) 0%, transparent 60%);
-    background-attachment: fixed;
-    backdrop-filter: blur(60px);
-    -webkit-backdrop-filter: blur(60px);
   }
 
   /* Custom scrollbar */
@@ -190,23 +184,6 @@
 .page-exit-active {
   opacity: 0;
   transition: opacity 300ms;
-}
-
-/* Animation delay utilities */
-.animation-delay-100 {
-  animation-delay: 100ms;
-}
-
-.animation-delay-200 {
-  animation-delay: 200ms;
-}
-
-.animation-delay-300 {
-  animation-delay: 300ms;
-}
-
-.animation-delay-500 {
-  animation-delay: 500ms;
 }
 
 /* Mobile-specific media queries */
