@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import useFaceRecognition from '@/hooks/useFaceRecognition';
 import { loadModels } from '@/services/face-recognition/ModelService';
 import { Json } from '@/integrations/supabase/types';
+import { format } from 'date-fns';
 
 const Attendance = () => {
   const { toast } = useToast();
@@ -93,7 +94,8 @@ const Attendance = () => {
             
             return {
               name: username,
-              time: new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              date: format(new Date(record.timestamp), 'MMM d, yyyy'), // Add formatted date
+              time: format(new Date(record.timestamp), 'h:mm a'),
               status: record.status === 'present' ? 'Present' : 'Unauthorized',
               confidence: record.confidence_score,
               id: record.id // Include ID to ensure unique keys
@@ -414,7 +416,9 @@ const Attendance = () => {
                           </div>
                           <div>
                             <p className="font-medium text-sm">{record.name}</p>
-                            <p className="text-xs text-muted-foreground">{record.time}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {record.date} • {record.time}
+                            </p>
                           </div>
                         </div>
                         <span className={`text-xs px-2 py-1 rounded-full ${

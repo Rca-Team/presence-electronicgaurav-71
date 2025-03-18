@@ -31,6 +31,12 @@ const DailyAttendanceDetails: React.FC<DailyAttendanceDetailsProps> = ({
     return format(date, 'h:mm a');
   };
 
+  // Format full date and time
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return format(date, 'MMM d, yyyy h:mm a');
+  };
+
   // Format date to show day of week and date
   const formatDateWithDay = (date: Date) => {
     return format(date, 'EEEE, MMMM d, yyyy');
@@ -66,14 +72,19 @@ const DailyAttendanceDetails: React.FC<DailyAttendanceDetailsProps> = ({
         <div className="space-y-2">
           {dailyAttendance.map((record) => (
             <div key={record.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
-              <div className="flex items-center">
-                {record.status === 'late' ? (
-                  <Clock className="h-4 w-4 text-amber-500 mr-2" />
-                ) : (
-                  <UserCheck className="h-4 w-4 text-green-500 mr-2" />
-                )}
-                <span>
-                  {formatTime(record.timestamp)}
+              <div className="flex flex-col">
+                <div className="flex items-center">
+                  {record.status === 'late' ? (
+                    <Clock className="h-4 w-4 text-amber-500 mr-2" />
+                  ) : (
+                    <UserCheck className="h-4 w-4 text-green-500 mr-2" />
+                  )}
+                  <span>
+                    {formatTime(record.timestamp)}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground ml-6">
+                  {formatDateTime(record.timestamp)}
                 </span>
               </div>
               <Badge variant={record.status === 'late' ? "outline" : "default"}>
