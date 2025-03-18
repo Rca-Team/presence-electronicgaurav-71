@@ -141,16 +141,18 @@ function calculateDistance(descriptor1: Float32Array, descriptor2: Float32Array)
 export async function recordAttendance(
   userId: string,
   status: 'present' | 'late' | 'absent',
-  confidence?: number
+  confidence?: number,
+  deviceInfo?: any
 ): Promise<any> {
   try {
     console.log(`Recording attendance for user ${userId} with status ${status}`);
     
     const timestamp = new Date().toISOString();
-    const deviceInfo = {
+    const fullDeviceInfo = {
       type: 'webcam',
       timestamp,
-      confidence
+      confidence,
+      ...deviceInfo
     };
     
     const { data, error } = await supabase
@@ -159,7 +161,8 @@ export async function recordAttendance(
         user_id: userId,
         timestamp,
         status,
-        device_info: deviceInfo,
+        device_info: fullDeviceInfo,
+        confidence_score: confidence
       })
       .select()
       .single();

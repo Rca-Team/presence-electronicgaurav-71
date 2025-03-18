@@ -68,37 +68,62 @@ const Attendance = () => {
           attendanceData.map(async (record) => {
             let username = 'Unknown';
             
-            // Try to get name from device_info first
-            if (record.device_info && typeof record.device_info === 'object' && !Array.isArray(record.device_info)) {
-              const deviceInfo = record.device_info as { [key: string]: Json };
-              if (deviceInfo.metadata && 
-                  typeof deviceInfo.metadata === 'object' && 
-                  !Array.isArray(deviceInfo.metadata) &&
-                  'name' in deviceInfo.metadata) {
-                username = deviceInfo.metadata.name as string;
+            // Try to get name from device_info first (improved access pattern)
+            if (record.device_info) {
+              try {
+                const deviceInfo = typeof record.device_info === 'string' 
+                  ? JSON.parse(record.device_info) 
+                  : record.device_info;
+                
+                // Check if metadata exists and has a name
+                if (deviceInfo.metadata && deviceInfo.metadata.name) {
+                  username = deviceInfo.metadata.name;
+                }
+                // Fallback if the name is directly in deviceInfo
+                else if (deviceInfo.name) {
+                  username = deviceInfo.name;
+                }
+              } catch (e) {
+                console.error('Error parsing device_info:', e);
               }
             }
             
-            // If no name in device_info, try to get from profiles table
+            // If still unknown, try to get from profiles table
             if (username === 'Unknown' && record.user_id) {
               const { data: profileData } = await supabase
                 .from('profiles')
-                .select('username')
+                .select('username, full_name')
                 .eq('id', record.user_id)
                 .maybeSingle();
                 
-              if (profileData && profileData.username) {
-                username = profileData.username;
+              if (profileData) {
+                // Prefer full name if available, otherwise use username
+                if (profileData.full_name) {
+                  username = profileData.full_name;
+                } else if (profileData.username) {
+                  username = profileData.username;
+                }
+              } else {
+                // Try the employees table as fallback
+                const { data: employeeData } = await supabase
+                  .from('employees')
+                  .select('name')
+                  .eq('user_id', record.user_id)
+                  .maybeSingle();
+                
+                if (employeeData && employeeData.name) {
+                  username = employeeData.name;
+                }
               }
             }
             
             return {
               name: username,
-              date: format(new Date(record.timestamp), 'MMM d, yyyy'), // Add formatted date
+              date: format(new Date(record.timestamp), 'MMM d, yyyy'),
               time: format(new Date(record.timestamp), 'h:mm a'),
               status: record.status === 'present' ? 'Present' : 'Unauthorized',
               confidence: record.confidence_score,
-              id: record.id // Include ID to ensure unique keys
+              id: record.id
             };
           })
         );
