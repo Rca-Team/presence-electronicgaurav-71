@@ -140,7 +140,7 @@ function calculateDistance(descriptor1: Float32Array, descriptor2: Float32Array)
 
 export async function recordAttendance(
   userId: string,
-  status: 'present' | 'late' | 'absent',
+  status: 'present' | 'late' | 'absent' | 'unauthorized',
   confidence?: number,
   deviceInfo?: any
 ): Promise<any> {
@@ -148,12 +148,37 @@ export async function recordAttendance(
     console.log(`Recording attendance for user ${userId} with status ${status}`);
     
     const timestamp = new Date().toISOString();
+    
+    // First, check if we can get user info from profiles table
+    let userName = null;
+    let userMetadata = null;
+    
+    if (userId && userId !== 'unknown') {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', userId)
+        .single();
+        
+      if (profileData && profileData.username) {
+        userName = profileData.username;
+        console.log(`Found username '${userName}' in profiles table`);
+      }
+    }
+    
+    // Preserve existing device info if available
     const fullDeviceInfo = {
       type: 'webcam',
       timestamp,
       confidence,
-      ...deviceInfo
+      ...deviceInfo,
+      metadata: {
+        ...deviceInfo?.metadata,
+        name: userName || deviceInfo?.metadata?.name || 'Unknown'
+      }
     };
+    
+    console.log('Recording attendance with device info:', fullDeviceInfo);
     
     const { data, error } = await supabase
       .from('attendance_records')
