@@ -56,7 +56,7 @@ const Attendance = () => {
         .from('attendance_records')
         .select('id, status, timestamp, confidence_score, user_id, device_info')
         .order('timestamp', { ascending: false })
-        .limit(10); // Show all records up to limit (not filtering by user)
+        .limit(10);
         
       if (attendanceError) {
         console.error('Error fetching recent attendance:', attendanceError);
@@ -68,19 +68,15 @@ const Attendance = () => {
           attendanceData.map(async (record) => {
             let username = 'Unknown';
             
-            // Try to get name from device_info first (improved access pattern)
             if (record.device_info) {
               try {
                 const deviceInfo = typeof record.device_info === 'string' 
                   ? JSON.parse(record.device_info) 
                   : record.device_info;
                 
-                // Check if metadata exists and has a name
                 if (deviceInfo.metadata && deviceInfo.metadata.name) {
                   username = deviceInfo.metadata.name;
-                }
-                // Fallback if the name is directly in deviceInfo
-                else if (deviceInfo.name) {
+                } else if (deviceInfo.name) {
                   username = deviceInfo.name;
                 }
               } catch (e) {
@@ -88,32 +84,15 @@ const Attendance = () => {
               }
             }
             
-            // If still unknown, try to get from profiles table
             if (username === 'Unknown' && record.user_id) {
               const { data: profileData } = await supabase
                 .from('profiles')
-                .select('username, full_name')
+                .select('username')
                 .eq('id', record.user_id)
                 .maybeSingle();
                 
-              if (profileData) {
-                // Prefer full name if available, otherwise use username
-                if (profileData.full_name) {
-                  username = profileData.full_name;
-                } else if (profileData.username) {
-                  username = profileData.username;
-                }
-              } else {
-                // Try the employees table as fallback
-                const { data: employeeData } = await supabase
-                  .from('employees')
-                  .select('name')
-                  .eq('user_id', record.user_id)
-                  .maybeSingle();
-                
-                if (employeeData && employeeData.name) {
-                  username = employeeData.name;
-                }
+              if (profileData && profileData.username) {
+                username = profileData.username;
               }
             }
             
@@ -134,13 +113,10 @@ const Attendance = () => {
       }
     };
     
-    // Fetch immediately
     fetchRecentAttendance();
     
-    // Set up real-time updates with 1-second interval for frequent updates
     const intervalId = setInterval(fetchRecentAttendance, 1000);
     
-    // Set up Supabase real-time subscription for immediate updates
     const subscription = supabase
       .channel('attendance_changes')
       .on('postgres_changes', { 
