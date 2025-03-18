@@ -12,6 +12,7 @@ import Attendance from "./pages/Attendance";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Admin from './pages/Admin';
+import Contact from './pages/Contact';
 import SplashAnimation from "./components/SplashAnimation";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ function App() {
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
